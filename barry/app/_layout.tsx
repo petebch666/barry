@@ -73,6 +73,8 @@ function AuthGate() {
       <Stack.Screen name="(app)" />
       <Stack.Screen name="create-group" options={{ presentation: 'modal' }} />
       <Stack.Screen name="create-ping" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="rsvp/[pingId]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="suggest-place/[pingId]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="join/[code]" />
     </Stack>
   );
