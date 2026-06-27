@@ -1,16 +1,26 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
+import { usePushTokenRegistration } from '@/hooks/usePushToken';
 import type { Session } from '@supabase/supabase-js';
-import { useRef, useState } from 'react';
+
+// Show notifications as banners while the app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 30, // 30 seconds
+      staleTime: 1000 * 30,
       retry: 1,
     },
   },
@@ -29,7 +39,8 @@ export default function RootLayout() {
 
 /**
  * Listens to Supabase auth state and redirects between the auth and app stacks.
- * Separated from RootLayout so providers are always mounted regardless of auth state.
+ * Also registers the device for push notifications and handles deep-link taps
+ * from notification banners.
  */
 function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -38,6 +49,10 @@ function AuthGate() {
   const segments = useSegments();
   const redirecting = useRef(false);
 
+  // Register push token whenever we have a signed-in user
+  usePushTokenRegistration(session?.user?.id ?? null);
+
+  // ── Auth state ──────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
@@ -51,6 +66,7 @@ function AuthGate() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── Route guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialized || redirecting.current) return;
 
@@ -66,6 +82,22 @@ function AuthGate() {
       redirecting.current = false;
     }
   }, [session, initialized, segments, router]);
+
+  // ── Notification deep-link (tap on banner while app is backgrounded/killed) ─
+  useEffect(() => {
+    // Fired when user taps a notification that opened the app from background/killed
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as {
+        pingId?: string;
+        type?: string;
+      };
+      if (data?.pingId) {
+        router.push(`/(app)/(feed)/ping/${data.pingId}`);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
