@@ -47,11 +47,6 @@
       "android": {
         "serviceAccountKeyPath": "./google-play-key.json",
         "track": "internal"
-      },
-      "ios": {
-        "appleId": "pierre.blanchard@ik.me",
-        "ascAppId": "",
-        "appleTeamId": ""
       }
     }
   }

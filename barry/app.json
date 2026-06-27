@@ -52,6 +52,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f18a045-40f0-4aba-b69e-4ef7dd26ab43"
+      }
+    },
+    "owner": "petebch"
   }
 }
