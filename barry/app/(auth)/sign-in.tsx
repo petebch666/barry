@@ -11,10 +11,12 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
 import { EmailAuthSchema } from '@/schemas';
+import { colors, radii } from '@/lib/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -59,7 +61,7 @@ export default function SignInScreen() {
   async function submitEmail() {
     const parsed = EmailAuthSchema.safeParse({ email, password });
     if (!parsed.success) {
-      Alert.alert('Validation error', parsed.error.errors[0].message);
+      Alert.alert('Validation error', parsed.error.issues[0]?.message ?? 'Validation failed');
       return;
     }
 
@@ -80,117 +82,115 @@ export default function SignInScreen() {
     }
   }
 
-  function toggleMode() {
-    setMode(m => (m === 'signin' ? 'signup' : 'signin'));
-  }
-
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Sign in to Barry</Text>
-        <Text style={styles.subtitle}>Choose how you'd like to continue</Text>
+    <View style={styles.root}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.wordmark}>barry</Text>
+            <Text style={styles.tagline}>plan the night, find the spot</Text>
+          </View>
 
-        <View style={styles.buttons}>
+          <View style={styles.card}>
+            <BlurView tint="dark" intensity={50} style={StyleSheet.absoluteFill} />
+            <View style={styles.cardOverlay} />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.textTertiary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={loading === null}
+              returnKeyType="next"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={colors.textTertiary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={loading === null}
+              returnKeyType="done"
+              onSubmitEditing={submitEmail}
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, loading !== null && styles.btnDisabled]}
+              onPress={submitEmail}
+              disabled={loading !== null}
+              accessibilityRole="button"
+              accessibilityLabel={mode === 'signin' ? 'Sign in' : 'Create account'}
+            >
+              {loading === 'email' ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryBtnText}>
+                  {mode === 'signin' ? 'Sign in' : 'Create account'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setMode(m => m === 'signin' ? 'signup' : 'signin')}
+              accessibilityRole="button"
+            >
+              <Text style={styles.toggleText}>
+                {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <OAuthButton
             label="Continue with Google"
-            icon="G"
+            prefix="G"
             onPress={() => signInWith('google')}
             loading={loading === 'google'}
             disabled={loading !== null}
           />
           <OAuthButton
             label="Continue with Apple"
-            icon=""
+            prefix=""
             onPress={() => signInWith('apple')}
             loading={loading === 'apple'}
             disabled={loading !== null}
-            dark
           />
-        </View>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.emailForm}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#94A3B8"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={loading === null}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password (min. 8 characters)"
-            placeholderTextColor="#94A3B8"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={loading === null}
-          />
-          <TouchableOpacity
-            style={styles.emailButton}
-            onPress={submitEmail}
-            disabled={loading !== null}
-            accessibilityRole="button"
-          >
-            {loading === 'email' ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.emailButtonLabel}>
-                {mode === 'signin' ? 'Sign in' : 'Create account'}
-              </Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={toggleMode} accessibilityRole="button">
-            <Text style={styles.toggleText}>
-              {mode === 'signin'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.legal}>
-          By continuing you agree to our Terms of Service and Privacy Policy.
-          Your friends' location data is never shared outside this app.
-        </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-interface OAuthButtonProps {
-  label: string;
-  icon: string;
-  onPress: () => void;
-  loading: boolean;
-  disabled: boolean;
-  dark?: boolean;
-}
-
-function OAuthButton({ label, icon, onPress, loading, disabled, dark }: OAuthButtonProps) {
+function OAuthButton({
+  label, prefix, onPress, loading, disabled,
+}: {
+  label: string; prefix: string; onPress: () => void; loading: boolean; disabled: boolean;
+}) {
   return (
     <TouchableOpacity
-      style={[styles.oauthButton, dark && styles.oauthButtonDark]}
+      style={[styles.oauthBtn, disabled && styles.btnDisabled]}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
     >
+      <BlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
+      <View style={styles.oauthBtnOverlay} />
       {loading ? (
-        <ActivityIndicator color={dark ? '#FFFFFF' : '#1E293B'} />
+        <ActivityIndicator color={colors.text} />
       ) : (
         <>
-          <Text style={[styles.oauthIcon, dark && styles.oauthIconDark]}>{icon}</Text>
-          <Text style={[styles.oauthLabel, dark && styles.oauthLabelDark]}>{label}</Text>
+          <Text style={styles.oauthPrefix}>{prefix}</Text>
+          <Text style={styles.oauthLabel}>{label}</Text>
         </>
       )}
     </TouchableOpacity>
@@ -198,117 +198,96 @@ function OAuthButton({ label, icon, onPress, loading, disabled, dark }: OAuthBut
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   container: {
-    backgroundColor: '#F8FAFC',
-    padding: 32,
-    paddingTop: 80,
-    paddingBottom: 48,
     flexGrow: 1,
     justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 64,
+    gap: 16,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
+  header: { alignItems: 'center', marginBottom: 8 },
+  wordmark: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -2,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    marginBottom: 48,
+  tagline: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+    letterSpacing: 0.3,
   },
-  buttons: {
+  card: {
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
     gap: 12,
   },
-  oauthButton: {
-    flexDirection: 'row',
+  cardOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+  },
+  input: {
+    height: 50,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: colors.text,
+  },
+  primaryBtn: {
+    height: 50,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    minHeight: 56,
+    marginTop: 4,
   },
-  oauthButtonDark: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  oauthIcon: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  oauthIconDark: {
-    color: '#FFFFFF',
-  },
-  oauthLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  oauthLabelDark: {
-    color: '#FFFFFF',
+  primaryBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  btnDisabled: { opacity: 0.45 },
+  toggleText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: colors.accent,
+    fontWeight: '500',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 28,
     gap: 12,
+    marginVertical: 4,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  dividerText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  emailForm: {
-    gap: 12,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    fontSize: 16,
-    color: '#1E293B',
-    minHeight: 56,
-  },
-  emailButton: {
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { fontSize: 13, color: colors.textTertiary, fontWeight: '500' },
+  oauthBtn: {
+    height: 50,
+    borderRadius: radii.sm,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6366F1',
-    borderRadius: 14,
-    paddingVertical: 16,
-    minHeight: 56,
-    marginTop: 4,
+    gap: 10,
   },
-  emailButtonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  oauthBtnOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
   },
-  toggleText: {
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#6366F1',
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  legal: {
-    marginTop: 40,
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  oauthPrefix: { fontSize: 16, fontWeight: '700', color: colors.text },
+  oauthLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
 });

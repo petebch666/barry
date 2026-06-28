@@ -1,61 +1,120 @@
+import { StyleSheet, TouchableOpacity, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { colors } from '@/lib/theme';
 
-export default function AppLayout() {
+const TABS = [
+  { name: '(feed)', icon: '◎', label: 'Feed' },
+  { name: '(profile)', icon: '◌', label: 'Me' },
+] as const;
+
+function GlassTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const activeName = state.routes[state.index]?.name;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#94A3B8',
-        tabBarStyle: {
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
-          paddingTop: 8,
-          height: 60 + (Platform.OS === 'ios' ? insets.bottom : 0),
-          borderTopColor: '#E2E8F0',
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-        },
-      }}
+    <View
+      style={[
+        styles.tabBarOuter,
+        { bottom: Math.max(insets.bottom, 8) + 16 },
+      ]}
+      pointerEvents="box-none"
     >
-      <Tabs.Screen
-        name="(feed)"
-        options={{
-          title: 'Feed',
-          tabBarIcon: ({ color }) => <TabIcon emoji="🔔" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="(groups)"
-        options={{
-          title: 'Groups',
-          tabBarIcon: ({ color }) => <TabIcon emoji="👥" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="(map)"
-        options={{
-          title: 'Map',
-          tabBarIcon: ({ color }) => <TabIcon emoji="📍" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="(profile)"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} />,
-        }}
-      />
+      <View style={styles.tabBarInner}>
+        <BlurView tint="dark" intensity={65} style={StyleSheet.absoluteFill} />
+        <View style={styles.tabBarOverlay} />
+        {TABS.map((tab) => {
+          const routeIndex = state.routes.findIndex((r) => r.name === tab.name);
+          const isFocused = state.index === routeIndex;
+          const isProfileRelated =
+            tab.name === '(profile)' && activeName === '(groups)';
+          const isActive = isFocused || isProfileRelated;
+
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              style={styles.tabItem}
+              onPress={() => {
+                const route = state.routes[routeIndex];
+                if (!isFocused && route) {
+                  navigation.navigate(route.name);
+                }
+              }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${tab.label} tab`}
+            >
+              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>
+                {tab.icon}
+              </Text>
+              <View style={[styles.dot, isActive && styles.dotActive]} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <Tabs
+      tabBar={(props) => <GlassTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tabs.Screen name="(feed)" />
+      <Tabs.Screen name="(groups)" options={{ href: null }} />
+      <Tabs.Screen name="(map)" options={{ href: null }} />
+      <Tabs.Screen name="(profile)" />
     </Tabs>
   );
 }
 
-function TabIcon({ emoji, color }: { emoji: string; color: string }) {
-  const { Text } = require('react-native');
-  return <Text style={{ fontSize: 20, opacity: color === '#3B82F6' ? 1 : 0.5 }}>{emoji}</Text>;
-}
+const styles = StyleSheet.create({
+  tabBarOuter: {
+    position: 'absolute',
+    left: 48,
+    right: 48,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tabBarInner: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  tabBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(18,14,28,0.55)',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  tabIcon: {
+    fontSize: 26,
+    color: colors.textTertiary,
+  },
+  tabIconActive: {
+    color: colors.text,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'transparent',
+  },
+  dotActive: {
+    backgroundColor: colors.accent,
+  },
+});

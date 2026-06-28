@@ -1,11 +1,10 @@
 import { Stack } from 'expo-router';
 
-export default function GroupsLayout() {
+export default function ProfileLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="[id]" />
-      <Stack.Screen name="[id]/members" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }

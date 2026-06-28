@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { CreateGroupSchema, type Group, type CreateGroup } from '@/schemas';
 import { z } from 'zod';
 
+const InviteCodeSchema = z.string().length(8);
+
 const QUERY_KEY = 'groups';
 
 export function useGroups() {
@@ -130,6 +132,55 @@ export function useRemoveMember(groupId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, groupId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    },
+  });
+}
+
+export function useGroupByInviteCode(code: string) {
+  return useQuery({
+    queryKey: [QUERY_KEY, 'invite', code],
+    queryFn: async () => {
+      if (!code || code.length !== 8) return null;
+      const { data, error } = await supabase
+        .from('groups')
+        .select('id, name, description')
+        .eq('invite_code', code.toUpperCase())
+        .single();
+      if (error) return null;
+      return data as Pick<Group, 'id' | 'name' | 'description'>;
+    },
+    enabled: !!code && code.length === 8,
+  });
+}
+
+export function useJoinGroup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (inviteCode: string) => {
+      InviteCodeSchema.parse(inviteCode.toUpperCase());
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: group, error: groupError } = await supabase
+        .from('groups')
+        .select('id, name')
+        .eq('invite_code', inviteCode.toUpperCase())
+        .single();
+
+      if (groupError || !group) throw new Error('Invalid invite code');
+
+      const { error: memberError } = await supabase
+        .from('group_members')
+        .insert({ group_id: group.id, user_id: user.id, role: 'member' });
+
+      if (memberError && memberError.code !== '23505') throw memberError;
+
+      return group as Pick<Group, 'id' | 'name'>;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
     },
   });

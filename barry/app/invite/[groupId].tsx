@@ -11,12 +11,17 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGroup, useInviteLink } from '@/hooks/useGroups';
+import { GlassCard } from '@/components/GlassCard';
+import { GlassButton } from '@/components/GlassButton';
+import { colors } from '@/lib/theme';
 
 export default function InviteModal() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const { data: group } = useGroup(groupId);
   const { data: inviteLink, isLoading } = useInviteLink(groupId);
+
+  const inviteCode = inviteLink?.split('/').pop() ?? '—';
 
   async function copyLink() {
     if (!inviteLink) return;
@@ -37,144 +42,107 @@ export default function InviteModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ width: 56 }} />
-        <Text style={styles.title}>Invite people</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        >
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        {/* Group identity */}
-        {group && (
-          <View style={styles.groupInfo}>
-            <View style={styles.groupAvatar}>
-              <Text style={styles.groupAvatarText}>{group.name[0].toUpperCase()}</Text>
-            </View>
-            <Text style={styles.groupName}>{group.name}</Text>
-          </View>
-        )}
-
-        <Text style={styles.label}>Share this link</Text>
-
-        {/* Link display */}
-        <View style={styles.linkBox}>
-          {isLoading ? (
-            <ActivityIndicator color="#6366F1" />
-          ) : (
-            <Text style={styles.linkText} numberOfLines={1} selectable>
-              {inviteLink ?? '—'}
-            </Text>
-          )}
+    <View style={styles.root}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.navBar}>
+          <View style={{ width: 56 }} />
+          <Text style={styles.title}>Invite people</Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Text style={styles.doneText}>Done</Text>
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.hint}>
-          Anyone with this link can join the group. The code doesn't expire.
-        </Text>
+        <View style={styles.content}>
+          {group && (
+            <View style={styles.groupInfo}>
+              <View style={styles.groupAvatar}>
+                <Text style={styles.groupAvatarText}>{group.name[0].toUpperCase()}</Text>
+              </View>
+              <Text style={styles.groupName}>{group.name}</Text>
+            </View>
+          )}
 
-        {/* Actions */}
-        <TouchableOpacity
-          style={styles.copyButton}
-          onPress={copyLink}
-          disabled={!inviteLink || isLoading}
-          accessibilityRole="button"
-          accessibilityLabel="Copy invite link"
-        >
-          <Text style={styles.copyButtonText}>Copy link</Text>
-        </TouchableOpacity>
+          <GlassCard style={styles.codeBox}>
+            {isLoading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <>
+                <Text style={styles.codeLabel}>Invite code</Text>
+                <Text style={styles.code} selectable>{inviteCode}</Text>
+                <Text style={styles.linkPreview} numberOfLines={1}>{inviteLink ?? '—'}</Text>
+              </>
+            )}
+          </GlassCard>
 
-        <TouchableOpacity
-          style={[styles.shareButton, (!inviteLink || isLoading) && styles.buttonDisabled]}
-          onPress={shareLink}
-          disabled={!inviteLink || isLoading}
-          accessibilityRole="button"
-          accessibilityLabel="Share invite link"
-        >
-          <Text style={styles.shareButtonText}>Share…</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <Text style={styles.hint}>
+            Anyone with this link can join the group. The code doesn't expire.
+          </Text>
+
+          <GlassButton
+            label="Copy link"
+            onPress={copyLink}
+            disabled={!inviteLink || isLoading}
+          />
+          <GlassButton
+            label="Share…"
+            variant="ghost"
+            onPress={shareLink}
+            disabled={!inviteLink || isLoading}
+          />
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
+  root: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
+  navBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
-  title: { fontSize: 17, fontWeight: '600', color: '#1E293B' },
-  doneText: { fontSize: 16, color: '#6366F1', fontWeight: '600', width: 56, textAlign: 'right' },
-
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-
-  groupInfo: { alignItems: 'center', marginBottom: 32 },
+  title: { fontSize: 17, fontWeight: '600', color: colors.text },
+  doneText: { fontSize: 16, color: colors.accent, fontWeight: '600', width: 56, textAlign: 'right' },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 16, gap: 16 },
+  groupInfo: { alignItems: 'center', paddingBottom: 8 },
   groupAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EEF2FF',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
   },
-  groupAvatarText: { fontSize: 26, fontWeight: '700', color: '#6366F1' },
-  groupName: { fontSize: 18, fontWeight: '600', color: '#1E293B' },
-
-  label: {
-    fontSize: 13,
+  groupAvatarText: { fontSize: 24, fontWeight: '700', color: colors.accent },
+  groupName: { fontSize: 18, fontWeight: '600', color: colors.text },
+  codeBox: { padding: 20, alignItems: 'center', gap: 6 },
+  codeLabel: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textTertiary,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 10,
   },
-
-  linkBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 10,
-    minHeight: 48,
-    justifyContent: 'center',
+  code: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: 6,
+    fontFamily: 'monospace',
   },
-  linkText: { fontSize: 14, color: '#6366F1', fontFamily: 'monospace', fontWeight: '500' },
-
-  hint: { fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 28 },
-
-  copyButton: {
-    backgroundColor: '#6366F1',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
+  linkPreview: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    fontFamily: 'monospace',
   },
-  copyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-
-  shareButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#6366F1',
-  },
-  shareButtonText: { color: '#6366F1', fontSize: 16, fontWeight: '600' },
-
-  buttonDisabled: { opacity: 0.5 },
+  hint: { fontSize: 13, color: colors.textTertiary, lineHeight: 18, textAlign: 'center' },
 });

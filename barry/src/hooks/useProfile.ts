@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { Profile, SavedPlace } from '@/schemas';
+import { SavedPlaceSchema, type Profile, type SavedPlace } from '@/schemas';
+import { z } from 'zod';
+
+const SavePlaceInputSchema = SavedPlaceSchema.pick({
+  name: true, address: true, latitude: true, longitude: true, category: true,
+}).extend({
+  google_place_id: z.string().nullable().optional(),
+});
 
 const QUERY_KEY = 'profile';
 
@@ -40,6 +47,49 @@ export function useUpdateProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    },
+  });
+}
+
+export function useSavePlace() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: z.infer<typeof SavePlaceInputSchema>) => {
+      const parsed = SavePlaceInputSchema.parse(input);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('saved_places')
+        .insert({ ...parsed, user_id: user.id });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'saved-places'] });
+    },
+  });
+}
+
+export function useDeleteSavedPlace() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (placeId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('saved_places')
+        .delete()
+        .eq('id', placeId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'saved-places'] });
     },
   });
 }

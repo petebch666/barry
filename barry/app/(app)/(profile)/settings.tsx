@@ -15,11 +15,12 @@ import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import { registerPushToken, deregisterPushToken } from '@/hooks/usePushToken';
 import { useProfile } from '@/hooks/useProfile';
+import { GlassCard } from '@/components/GlassCard';
+import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { data: profile } = useProfile();
-
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -41,10 +42,9 @@ export default function SettingsScreen() {
         if (success) {
           setNotificationsEnabled(true);
         } else {
-          // OS permission is denied — we can't enable it programmatically
           Alert.alert(
             'Notifications blocked',
-            'Barry doesn\'t have notification permission. Enable it in your device settings.',
+            "Barry doesn't have notification permission. Enable it in your device settings.",
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Open settings', onPress: () => Linking.openSettings() },
@@ -81,91 +81,86 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
-        <View style={{ width: 56 }} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Notifications */}
-        <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
-        <View style={styles.card}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Push notifications</Text>
-              <Text style={styles.settingSubLabel}>
-                Pings, voting starts, and meetup confirmations
-              </Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={toggleNotifications}
-              disabled={notifLoading}
-              trackColor={{ true: '#6366F1' }}
-              accessibilityLabel="Toggle push notifications"
-            />
-          </View>
-        </View>
-
-        {/* Account */}
-        <Text style={[styles.sectionTitle, { marginTop: 28 }]}>ACCOUNT</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.destructiveRow}
-            onPress={confirmDeleteAccount}
-            accessibilityRole="button"
-            accessibilityLabel="Delete my account"
-          >
-            <Text style={styles.destructiveLabel}>Delete my account</Text>
-            <Text style={styles.chevron}>›</Text>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.navBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>‹ Back</Text>
           </TouchableOpacity>
+          <Text style={styles.title}>Settings</Text>
+          <View style={{ width: 60 }} />
         </View>
-        <Text style={styles.destructiveHint}>
-          Permanently removes your profile, groups, pings, and location data. This action cannot be reversed.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.sectionLabel}>NOTIFICATIONS</Text>
+          <GlassCard style={styles.card}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingText}>
+                <Text style={styles.settingLabel}>Push notifications</Text>
+                <Text style={styles.settingSubLabel}>
+                  Pings, voting starts, and meetup confirmations
+                </Text>
+              </View>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={toggleNotifications}
+                disabled={notifLoading}
+                trackColor={{ true: colors.accent }}
+                accessibilityLabel="Toggle push notifications"
+              />
+            </View>
+          </GlassCard>
+
+          <Text style={[styles.sectionLabel, { marginTop: 28 }]}>ACCOUNT</Text>
+          <GlassCard style={styles.card}>
+            <TouchableOpacity
+              style={styles.destructiveRow}
+              onPress={confirmDeleteAccount}
+              accessibilityRole="button"
+              accessibilityLabel="Delete my account"
+            >
+              <Text style={styles.destructiveLabel}>Delete my account</Text>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          </GlassCard>
+          <Text style={styles.destructiveHint}>
+            Permanently removes your profile, groups, pings, and location data. This action cannot be reversed.
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
+  root: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
+  navBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
-  backButton: { paddingVertical: 4 },
-  backText: { fontSize: 17, color: '#6366F1', fontWeight: '500' },
-  title: { fontSize: 17, fontWeight: '600', color: '#1E293B' },
-
-  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-
-  sectionTitle: {
-    fontSize: 12,
+  backBtn: { paddingVertical: 4 },
+  backText: { fontSize: 17, color: colors.accent, fontWeight: '500' },
+  title: { fontSize: 17, fontWeight: '600', color: colors.text },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: BOTTOM_TAB_PADDING,
+    gap: 8,
+  },
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
+    color: colors.textTertiary,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: 2,
+    paddingHorizontal: 4,
   },
-
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-
+  card: { overflow: 'hidden' },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,9 +169,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   settingText: { flex: 1 },
-  settingLabel: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
-  settingSubLabel: { fontSize: 13, color: '#64748B', marginTop: 2, lineHeight: 18 },
-
+  settingLabel: { fontSize: 15, fontWeight: '500', color: colors.text },
+  settingSubLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 18,
+  },
   destructiveRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,14 +183,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  destructiveLabel: { fontSize: 15, fontWeight: '500', color: '#EF4444' },
-  chevron: { fontSize: 20, color: '#CBD5E1' },
-
+  destructiveLabel: { fontSize: 15, fontWeight: '500', color: colors.error },
+  chevron: { fontSize: 20, color: colors.textTertiary },
   destructiveHint: {
-    fontSize: 13,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: colors.textTertiary,
     lineHeight: 18,
-    marginTop: 8,
     paddingHorizontal: 4,
   },
 });

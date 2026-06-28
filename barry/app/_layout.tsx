@@ -30,7 +30,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
         <AuthGate />
       </GestureHandlerRootView>
     </QueryClientProvider>
@@ -108,6 +108,7 @@ function AuthGate() {
       <Stack.Screen name="rsvp/[pingId]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="suggest-place/[pingId]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="join/[code]" />
+      <Stack.Screen name="invite/[groupId]" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

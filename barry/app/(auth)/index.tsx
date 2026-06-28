@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { colors } from '@/lib/theme';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -7,7 +8,7 @@ export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.title}>Barry</Text>
+        <Text style={styles.wordmark}>barry</Text>
         <Text style={styles.subtitle}>
           Find the best spot to meet your friends — halfway between everyone.
         </Text>
@@ -27,37 +28,30 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.bg,
     justifyContent: 'space-between',
     padding: 32,
-    paddingTop: 80,
-    paddingBottom: 48,
+    paddingTop: 100,
+    paddingBottom: 56,
   },
-  hero: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 56,
+  hero: { flex: 1, justifyContent: 'center' },
+  wordmark: {
+    fontSize: 72,
     fontWeight: '800',
-    color: '#1E293B',
-    letterSpacing: -2,
-    marginBottom: 16,
+    color: colors.text,
+    letterSpacing: -3,
+    marginBottom: 20,
   },
   subtitle: {
     fontSize: 20,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 28,
   },
   button: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 16,
+    backgroundColor: colors.accent,
+    borderRadius: 100,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
+  buttonText: { color: colors.text, fontSize: 17, fontWeight: '700' },
 });
