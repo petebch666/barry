@@ -6,6 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSuggestPlace } from '@/hooks/usePlaces';
+import { colors, radii } from '@/lib/theme';
 
 export default function SuggestPlaceModal() {
   const { pingId } = useLocalSearchParams<{ pingId: string }>();
@@ -46,6 +47,8 @@ export default function SuggestPlaceModal() {
     }
   }
 
+  const canAdd = !!name.trim();
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -56,50 +59,81 @@ export default function SuggestPlaceModal() {
           <Text style={styles.title}>Suggest a Place</Text>
           <TouchableOpacity
             onPress={submit}
-            disabled={isPending || !name.trim()}
+            disabled={isPending || !canAdd}
             accessibilityRole="button"
             accessibilityLabel="Add place"
           >
             {isPending ? (
-              <ActivityIndicator color="#3B82F6" />
+              <ActivityIndicator color={colors.accent} />
             ) : (
-              <Text style={[styles.add, !name.trim() && styles.addDisabled]}>Add</Text>
+              <Text style={[styles.add, !canAdd && styles.addDisabled]}>Add</Text>
             )}
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Text style={styles.hint}>
-            Tip: Open Google Maps, find the place, tap "Share" → copy the coordinates.
-          </Text>
+          <View style={styles.tipBox}>
+            <Text style={styles.tip}>
+              Tip: Open Google Maps, find the place, tap "Share" → copy the coordinates.
+            </Text>
+          </View>
 
           <Text style={styles.label}>Venue name *</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName}
-            placeholder="Le Bar du Coin" placeholderTextColor="#94A3B8" maxLength={200}
-            autoFocus accessibilityLabel="Venue name" />
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Le Bar du Coin"
+            placeholderTextColor={colors.textTertiary}
+            maxLength={200}
+            autoFocus
+            accessibilityLabel="Venue name"
+          />
 
           <Text style={styles.label}>Address</Text>
-          <TextInput style={styles.input} value={address} onChangeText={setAddress}
-            placeholder="12 rue de Rivoli, Paris" placeholderTextColor="#94A3B8"
-            accessibilityLabel="Address" />
+          <TextInput
+            style={styles.input}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="12 rue de Rivoli, Paris"
+            placeholderTextColor={colors.textTertiary}
+            accessibilityLabel="Address"
+          />
 
           <Text style={styles.label}>Category</Text>
-          <TextInput style={styles.input} value={category} onChangeText={setCategory}
-            placeholder="bar / restaurant / café…" placeholderTextColor="#94A3B8"
-            accessibilityLabel="Category" />
+          <TextInput
+            style={styles.input}
+            value={category}
+            onChangeText={setCategory}
+            placeholder="bar / restaurant / café…"
+            placeholderTextColor={colors.textTertiary}
+            accessibilityLabel="Category"
+          />
 
           <View style={styles.coordRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Latitude *</Text>
-              <TextInput style={styles.input} value={latitude} onChangeText={setLatitude}
-                placeholder="48.8566" placeholderTextColor="#94A3B8" keyboardType="decimal-pad"
-                accessibilityLabel="Latitude" />
+              <TextInput
+                style={styles.input}
+                value={latitude}
+                onChangeText={setLatitude}
+                placeholder="48.8566"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+                accessibilityLabel="Latitude"
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Longitude *</Text>
-              <TextInput style={styles.input} value={longitude} onChangeText={setLongitude}
-                placeholder="2.3522" placeholderTextColor="#94A3B8" keyboardType="decimal-pad"
-                accessibilityLabel="Longitude" />
+              <TextInput
+                style={styles.input}
+                value={longitude}
+                onChangeText={setLongitude}
+                placeholder="2.3522"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+                accessibilityLabel="Longitude"
+              />
             </View>
           </View>
         </ScrollView>
@@ -109,26 +143,48 @@ export default function SuggestPlaceModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  cancel: { fontSize: 16, color: '#64748B' },
-  title: { fontSize: 17, fontWeight: '600', color: '#1E293B' },
-  add: { fontSize: 16, fontWeight: '600', color: '#3B82F6' },
-  addDisabled: { color: '#CBD5E1' },
+  cancel: { fontSize: 16, color: colors.textSecondary },
+  title: { fontSize: 17, fontWeight: '600', color: colors.text },
+  add: { fontSize: 16, fontWeight: '600', color: colors.accent },
+  addDisabled: { color: colors.textTertiary },
   form: { padding: 20, gap: 6 },
-  hint: {
-    fontSize: 13, color: '#64748B', backgroundColor: '#F1F5F9',
-    borderRadius: 8, padding: 12, lineHeight: 18,
+  tipBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    marginTop: 4,
   },
-  label: { fontSize: 13, fontWeight: '600', color: '#64748B', marginTop: 16, marginBottom: 4 },
+  tip: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 16,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   input: {
-    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#E2E8F0',
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 16, color: '#1E293B',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: colors.text,
   },
   coordRow: { flexDirection: 'row', gap: 12 },
 });

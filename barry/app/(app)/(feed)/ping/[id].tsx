@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,6 +6,7 @@ import { usePing, usePingRealtime, useStartVoting } from '@/hooks/usePings';
 import { useRsvps, useRsvpsRealtime, useMyRsvp } from '@/hooks/useRsvps';
 import { usePlaces, usePlacesRealtime } from '@/hooks/usePlaces';
 import { useVotes, useVotesRealtime, useCastVote, useMyVote, useVoteCounts } from '@/hooks/useVotes';
+import { useSavePlace } from '@/hooks/useProfile';
 import { computeBarycenter, haversineMeters } from '@/utils/barycenter';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
@@ -31,6 +33,7 @@ export default function PingDetailScreen() {
 
   const { mutateAsync: startVoting, isPending: isStartingVoting } = useStartVoting();
   const { mutateAsync: castVote, isPending: isCasting } = useCastVote();
+  const { mutateAsync: savePlace } = useSavePlace();
 
   const inRsvpsWithLocation = rsvps.filter(
     (r) => r.status === 'in' && r.latitude != null && r.longitude != null,
@@ -151,6 +154,16 @@ export default function PingDetailScreen() {
                     await castVote({ ping_id: pingId, place_id: place.id });
                   }}
                   isCasting={isCasting}
+                  onSave={async () => {
+                    await savePlace({
+                      name: place.name,
+                      address: place.address,
+                      latitude: place.latitude,
+                      longitude: place.longitude,
+                      category: place.category,
+                      google_place_id: place.external_id,
+                    });
+                  }}
                 />
               ))}
 
@@ -180,7 +193,7 @@ export default function PingDetailScreen() {
 }
 
 function PlaceCard({
-  place, votes, totalIn, myVotePlaceId, barycenter, isConfirmed, onVote, isCasting,
+  place, votes, totalIn, myVotePlaceId, barycenter, isConfirmed, onVote, isCasting, onSave,
 }: {
   place: Place;
   votes: number;
@@ -190,11 +203,28 @@ function PlaceCard({
   isConfirmed: boolean;
   onVote: () => void;
   isCasting: boolean;
+  onSave: () => Promise<void>;
 }) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const isMyVote = myVotePlaceId === place.id;
   const distanceM = barycenter
     ? Math.round(haversineMeters(barycenter, { latitude: place.latitude, longitude: place.longitude }))
     : null;
+
+  async function handleSave() {
+    if (saved || saving) return;
+    setSaving(true);
+    try {
+      await onSave();
+      setSaved(true);
+    } catch {
+      // already saved or network error — silently ignore
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <GlassCard style={[styles.placeCard, isConfirmed && styles.placeCardConfirmed]}>
@@ -248,7 +278,23 @@ function PlaceCard({
           ]}
         />
       </View>
-      <Text style={styles.voteCount}>{votes}/{totalIn} votes</Text>
+      <View style={styles.voteFooter}>
+        <Text style={styles.voteCount}>{votes}/{totalIn} votes</Text>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saved || saving}
+          accessibilityRole="button"
+          accessibilityLabel={saved ? 'Place saved' : 'Save place'}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Text style={[styles.saveIcon, saved && styles.saveIconSaved]}>
+              {saved ? '♥' : '♡'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </GlassCard>
   );
 }
@@ -321,5 +367,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   voteBarFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 2 },
+  voteFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   voteCount: { fontSize: 12, color: colors.textTertiary },
+  saveIcon: { fontSize: 20, color: colors.textTertiary },
+  saveIconSaved: { color: colors.error },
 });

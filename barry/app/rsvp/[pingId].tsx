@@ -7,12 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useUpsertRsvp } from '@/hooks/useRsvps';
 import { usePing } from '@/hooks/usePings';
+import { colors, radii } from '@/lib/theme';
 import type { RsvpStatus } from '@/schemas';
 
 const STATUS_OPTIONS: { value: RsvpStatus; label: string; emoji: string; color: string }[] = [
-  { value: 'in',    label: 'I\'m in!',  emoji: '✅', color: '#10B981' },
-  { value: 'maybe', label: 'Maybe',     emoji: '🤔', color: '#F59E0B' },
-  { value: 'out',   label: 'Can\'t make it', emoji: '❌', color: '#EF4444' },
+  { value: 'in',    label: 'I\'m in!',       emoji: '✅', color: colors.success },
+  { value: 'maybe', label: 'Maybe',           emoji: '🤔', color: colors.warning },
+  { value: 'out',   label: 'Can\'t make it', emoji: '❌', color: colors.error },
 ];
 
 export default function RsvpModal() {
@@ -83,7 +84,7 @@ export default function RsvpModal() {
             key={opt.value}
             style={[
               styles.option,
-              selected === opt.value && { borderColor: opt.color, backgroundColor: opt.color + '11' },
+              selected === opt.value && { borderColor: opt.color, backgroundColor: opt.color + '22' },
             ]}
             onPress={() => setSelected(opt.value)}
             accessibilityRole="radio"
@@ -109,7 +110,8 @@ export default function RsvpModal() {
           <Switch
             value={shareLocation}
             onValueChange={setShareLocation}
-            trackColor={{ true: '#3B82F6' }}
+            trackColor={{ true: colors.accent }}
+            thumbColor={colors.text}
             accessibilityLabel="Share location toggle"
           />
         </View>
@@ -117,14 +119,14 @@ export default function RsvpModal() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.submitButton}
+          style={[styles.submitButton, (isPending || locating) && styles.submitDisabled]}
           onPress={submit}
           disabled={isPending || locating}
           accessibilityRole="button"
           accessibilityLabel="Confirm RSVP"
         >
           {isPending || locating ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.text} />
           ) : (
             <Text style={styles.submitText}>Confirm</Text>
           )}
@@ -135,7 +137,7 @@ export default function RsvpModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -143,52 +145,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: colors.border,
   },
-  cancel: { fontSize: 16, color: '#64748B' },
-  title: { fontSize: 17, fontWeight: '600', color: '#1E293B' },
+  cancel: { fontSize: 16, color: colors.textSecondary },
+  title: { fontSize: 17, fontWeight: '600', color: colors.text },
   pingPreview: {
     margin: 20,
     padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
-  pingMessage: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+  pingMessage: { fontSize: 16, fontWeight: '600', color: colors.text },
   options: { paddingHorizontal: 20, gap: 10 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   optionEmoji: { fontSize: 22 },
-  optionLabel: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+  optionLabel: { fontSize: 16, fontWeight: '600', color: colors.text },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
     margin: 20,
     padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
   locationText: { flex: 1 },
-  locationTitle: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-  locationSubtitle: { fontSize: 13, color: '#64748B', marginTop: 4, lineHeight: 18 },
+  locationTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  locationSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 18 },
   footer: { flex: 1, justifyContent: 'flex-end', padding: 20 },
   submitButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 14,
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  submitText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+  submitDisabled: { opacity: 0.5 },
+  submitText: { color: colors.text, fontSize: 17, fontWeight: '600' },
 });

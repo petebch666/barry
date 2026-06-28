@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  FlatList,
   ActivityIndicator,
   TextInput,
   Modal,
@@ -16,26 +15,51 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
-import { useProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile, useSavedPlaces, useDeleteSavedPlace } from '@/hooks/useProfile';
 import { useGroups, useJoinGroup } from '@/hooks/useGroups';
 import { deregisterPushToken } from '@/hooks/usePushToken';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
-import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
-import type { Group } from '@/schemas';
+import { colors, radii, BOTTOM_TAB_PADDING } from '@/lib/theme';
+import type { Group, SavedPlace } from '@/schemas';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: groups = [], isLoading: groupsLoading } = useGroups();
+  const { data: savedPlaces = [], isLoading: placesLoading } = useSavedPlaces();
   const { mutateAsync: joinGroup, isPending: isJoining } = useJoinGroup();
+  const { mutateAsync: updateProfile, isPending: isSavingName } = useUpdateProfile();
+  const { mutateAsync: deletePlace } = useDeleteSavedPlace();
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
 
   const initials = profile?.display_name
     ? profile.display_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
     : '?';
+
+  function startEditName() {
+    setNameInput(profile?.display_name ?? '');
+    setEditingName(true);
+  }
+
+  async function submitName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === profile?.display_name) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      await updateProfile({ display_name: trimmed });
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not update name.');
+    } finally {
+      setEditingName(false);
+    }
+  }
 
   async function signOut() {
     Alert.alert('Sign out', 'Are you sure?', [
@@ -68,6 +92,23 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleDeletePlace(placeId: string, placeName: string) {
+    Alert.alert('Remove saved place', `Remove "${placeName}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deletePlace(placeId);
+          } catch (err) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Could not remove place.');
+          }
+        },
+      },
+    ]);
+  }
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -85,8 +126,29 @@ export default function ProfileScreen() {
               <View style={styles.nameBlock}>
                 {profileLoading ? (
                   <ActivityIndicator color={colors.accent} />
+                ) : editingName ? (
+                  <TextInput
+                    style={styles.nameInput}
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                    onBlur={submitName}
+                    onSubmitEditing={submitName}
+                    autoFocus
+                    maxLength={60}
+                    returnKeyType="done"
+                    accessibilityLabel="Display name"
+                  />
                 ) : (
-                  <Text style={styles.displayName}>{profile?.display_name ?? '—'}</Text>
+                  <TouchableOpacity
+                    onPress={startEditName}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit display name"
+                  >
+                    <Text style={styles.displayName}>{profile?.display_name ?? '—'}</Text>
+                    <Text style={styles.editHint}>
+                      {isSavingName ? 'Saving…' : 'Tap to edit'}
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
@@ -128,6 +190,32 @@ export default function ProfileScreen() {
             <View style={styles.groupsList}>
               {groups.map((group) => (
                 <GroupRow key={group.id} group={group} />
+              ))}
+            </View>
+          )}
+
+          {/* ── Saved Places section ── */}
+          <View style={[styles.sectionHeader, { marginTop: 8 }]}>
+            <Text style={styles.sectionTitle}>Saved Places</Text>
+          </View>
+
+          {placesLoading ? (
+            <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+          ) : savedPlaces.length === 0 ? (
+            <GlassCard style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No saved places</Text>
+              <Text style={styles.emptyHint}>
+                Tap ♡ on a venue during voting to save it.
+              </Text>
+            </GlassCard>
+          ) : (
+            <View style={styles.groupsList}>
+              {savedPlaces.map((place) => (
+                <SavedPlaceRow
+                  key={place.id}
+                  place={place}
+                  onDelete={() => handleDeletePlace(place.id, place.name)}
+                />
               ))}
             </View>
           )}
@@ -222,6 +310,32 @@ function GroupRow({ group }: { group: Group }) {
   );
 }
 
+function SavedPlaceRow({ place, onDelete }: { place: SavedPlace; onDelete: () => void }) {
+  return (
+    <GlassCard style={styles.savedPlaceRow}>
+      <View style={styles.savedPlaceIcon}>
+        <Text style={styles.savedPlaceEmoji}>♥</Text>
+      </View>
+      <View style={styles.savedPlaceInfo}>
+        <Text style={styles.savedPlaceName}>{place.name}</Text>
+        {place.address ? (
+          <Text style={styles.savedPlaceAddr} numberOfLines={1}>{place.address}</Text>
+        ) : place.category ? (
+          <Text style={styles.savedPlaceAddr}>{place.category}</Text>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        onPress={onDelete}
+        style={styles.deleteBtn}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${place.name}`}
+      >
+        <Text style={styles.deleteBtnText}>×</Text>
+      </TouchableOpacity>
+    </GlassCard>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1 },
@@ -246,6 +360,15 @@ const styles = StyleSheet.create({
   avatarInitials: { color: colors.text, fontSize: 20, fontWeight: '700' },
   nameBlock: { flex: 1 },
   displayName: { fontSize: 20, fontWeight: '700', color: colors.text },
+  editHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
+  nameInput: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent,
+    paddingVertical: 2,
+  },
 
   sectionHeader: {
     flexDirection: 'row',
@@ -282,6 +405,29 @@ const styles = StyleSheet.create({
   groupDesc: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   chevron: { fontSize: 20, color: colors.textTertiary },
 
+  savedPlaceRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  savedPlaceIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedPlaceEmoji: { fontSize: 16, color: colors.error },
+  savedPlaceInfo: { flex: 1 },
+  savedPlaceName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  savedPlaceAddr: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnText: { fontSize: 18, color: colors.textSecondary, lineHeight: 22 },
+
   emptyCard: { padding: 24, alignItems: 'center', gap: 6 },
   emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
   emptyHint: { fontSize: 14, color: colors.textTertiary, textAlign: 'center' },
@@ -293,7 +439,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: radii.sm,
     paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: colors.surface,

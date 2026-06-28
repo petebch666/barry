@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCreatePing } from '@/hooks/usePings';
 import { useGroups } from '@/hooks/useGroups';
+import { colors, radii } from '@/lib/theme';
 import type { Group } from '@/schemas';
 
 export default function CreatePingModal() {
@@ -36,6 +37,8 @@ export default function CreatePingModal() {
     }
   }
 
+  const canSend = !!selectedGroupId && !!message.trim();
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -49,19 +52,14 @@ export default function CreatePingModal() {
           <Text style={styles.title}>Send a Ping</Text>
           <TouchableOpacity
             onPress={submit}
-            disabled={isPending || !selectedGroupId || !message.trim()}
+            disabled={isPending || !canSend}
             accessibilityRole="button"
             accessibilityLabel="Send ping"
           >
             {isPending ? (
-              <ActivityIndicator color="#3B82F6" />
+              <ActivityIndicator color={colors.accent} />
             ) : (
-              <Text style={[
-                styles.send,
-                (!selectedGroupId || !message.trim()) && styles.sendDisabled,
-              ]}>
-                Send
-              </Text>
+              <Text style={[styles.send, !canSend && styles.sendDisabled]}>Send</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -97,7 +95,7 @@ export default function CreatePingModal() {
             value={message}
             onChangeText={setMessage}
             placeholder="Anyone for a drink tonight?"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.textTertiary}
             maxLength={500}
             multiline
             numberOfLines={3}
@@ -109,7 +107,8 @@ export default function CreatePingModal() {
           {selectedGroup && (
             <View style={styles.summary}>
               <Text style={styles.summaryText}>
-                Your ping will be sent to all members of <Text style={styles.bold}>{selectedGroup.name}</Text>.
+                Your ping will be sent to all members of{' '}
+                <Text style={styles.summaryBold}>{selectedGroup.name}</Text>.
                 It expires in 8 hours if no meetup is confirmed.
               </Text>
             </View>
@@ -121,7 +120,7 @@ export default function CreatePingModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -129,44 +128,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: colors.border,
   },
-  cancel: { fontSize: 16, color: '#64748B' },
-  title: { fontSize: 17, fontWeight: '600', color: '#1E293B' },
-  send: { fontSize: 16, fontWeight: '600', color: '#3B82F6' },
-  sendDisabled: { color: '#CBD5E1' },
+  cancel: { fontSize: 16, color: colors.textSecondary },
+  title: { fontSize: 17, fontWeight: '600', color: colors.text },
+  send: { fontSize: 16, fontWeight: '600', color: colors.accent },
+  sendDisabled: { color: colors.textTertiary },
   form: { padding: 20, gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: '#64748B', marginTop: 16, marginBottom: 8 },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   groupList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   groupChip: {
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
-  groupChipSelected: { borderColor: '#3B82F6', backgroundColor: '#EFF6FF' },
-  groupChipText: { fontSize: 14, fontWeight: '500', color: '#64748B' },
-  groupChipTextSelected: { color: '#3B82F6', fontWeight: '600' },
+  groupChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  groupChipText: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
+  groupChipTextSelected: { color: colors.accent, fontWeight: '600' },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.text,
   },
   inputMultiline: { height: 100, textAlignVertical: 'top' },
-  hint: { fontSize: 12, color: '#94A3B8', alignSelf: 'flex-end' },
+  hint: { fontSize: 12, color: colors.textTertiary, alignSelf: 'flex-end' },
   summary: {
     marginTop: 20,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 14,
   },
-  summaryText: { fontSize: 14, color: '#64748B', lineHeight: 20 },
-  bold: { fontWeight: '600', color: '#1E293B' },
+  summaryText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  summaryBold: { fontWeight: '600', color: colors.text },
 });
