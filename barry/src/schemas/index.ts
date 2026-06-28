@@ -137,6 +137,13 @@ export const SavedPlaceSchema = z.object({
   created_at: z.string().datetime(),
 });
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export const EmailAuthSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type Profile = z.infer<typeof ProfileSchema>;
@@ -154,3 +161,4 @@ export type SuggestPlace = z.infer<typeof SuggestPlaceSchema>;
 export type Vote = z.infer<typeof VoteSchema>;
 export type CastVote = z.infer<typeof CastVoteSchema>;
 export type SavedPlace = z.infer<typeof SavedPlaceSchema>;
+export type EmailAuth = z.infer<typeof EmailAuthSchema>;

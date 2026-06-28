@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useProfile, useSavedPlaces } from '@/hooks/useProfile';
@@ -15,6 +16,7 @@ import { deregisterPushToken } from '@/hooks/usePushToken';
 import type { SavedPlace } from '@/schemas';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: savedPlaces = [], isLoading: placesLoading } = useSavedPlaces();
 
@@ -90,8 +92,17 @@ export default function ProfileScreen() {
         />
       )}
 
-      {/* Sign out */}
+      {/* Footer: settings + sign out */}
       <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => router.push('/(app)/(profile)/settings' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
+          <Text style={styles.settingsText}>Settings</Text>
+          <Text style={styles.settingsChevron}>›</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={signOut}
@@ -198,7 +209,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  footer: { padding: 20 },
+  footer: { padding: 20, gap: 12 },
+  settingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  settingsText: { fontSize: 16, fontWeight: '500', color: '#1E293B' },
+  settingsChevron: { fontSize: 20, color: '#CBD5E1' },
   signOutButton: {
     borderWidth: 1.5,
     borderColor: '#EF4444',

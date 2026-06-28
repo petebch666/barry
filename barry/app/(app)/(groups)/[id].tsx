@@ -4,13 +4,11 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Share,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useGroup, useGroupMembers, useInviteLink } from '@/hooks/useGroups';
+import { useGroup, useGroupMembers } from '@/hooks/useGroups';
 import { useGroupPings } from '@/hooks/usePings';
 import type { Ping } from '@/schemas';
 
@@ -20,18 +18,9 @@ export default function GroupDetailScreen() {
   const { data: group, isLoading: groupLoading } = useGroup(id);
   const { data: members = [], isLoading: membersLoading } = useGroupMembers(id);
   const { data: pings = [], isLoading: pingsLoading } = useGroupPings(id);
-  const { data: inviteLink } = useInviteLink(id);
 
-  async function shareInvite() {
-    if (!inviteLink) return;
-    try {
-      await Share.share({
-        message: `Join my group "${group?.name}" on Barry: ${inviteLink}`,
-        url: inviteLink,
-      });
-    } catch {
-      Alert.alert('Could not share', 'Please try again.');
-    }
+  function openInviteModal() {
+    router.push(`/invite/${id}` as never);
   }
 
   if (groupLoading) {
@@ -71,7 +60,7 @@ export default function GroupDetailScreen() {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={shareInvite}
+                  onPress={openInviteModal}
                   accessibilityRole="button"
                   accessibilityLabel="Share invite link"
                 >
@@ -101,9 +90,18 @@ export default function GroupDetailScreen() {
 
             {/* Members strip */}
             <View style={styles.membersSection}>
-              <Text style={styles.sectionTitle}>
-                {membersLoading ? 'Members' : `Members (${members.length})`}
-              </Text>
+              <View style={styles.membersSectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {membersLoading ? 'Members' : `Members (${members.length})`}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push(`/(app)/(groups)/${id}/members` as never)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Manage members"
+                >
+                  <Text style={styles.manageLink}>Manage ›</Text>
+                </TouchableOpacity>
+              </View>
               {membersLoading ? (
                 <ActivityIndicator color="#6366F1" />
               ) : (
@@ -242,6 +240,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
+  membersSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  manageLink: { fontSize: 13, color: '#6366F1', fontWeight: '600' },
   membersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   memberChip: {
     width: 38,

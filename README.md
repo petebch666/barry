@@ -25,7 +25,7 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 | Language | TypeScript (strict) |
 | Navigation | Expo Router v3 (file-based) |
 | Backend | Supabase (PostgreSQL + Realtime + Edge Functions) |
-| Auth | Google OAuth + Apple Sign In via Supabase PKCE flow |
+| Auth | Google OAuth + Apple Sign In + Email/Password via Supabase |
 | Maps | react-native-maps (Google Maps SDK) |
 | Places | Google Places Nearby Search API (server-side only) |
 | Location | expo-location (foreground, per-ping opt-in) |
@@ -80,12 +80,12 @@ barry/                          ← Expo project root
 
 ## Prerequisites
 
-- Node.js 20+
-- [Expo CLI](https://docs.expo.dev/more/expo-cli/): `npm install -g expo-cli`
+- Node.js 24 LTS
 - [EAS CLI](https://docs.expo.dev/eas/): `npm install -g eas-cli`
 - [Supabase CLI](https://supabase.com/docs/guides/cli): `npm install -g supabase`
 - A Supabase project (free tier works)
 - A Google Cloud project with **Maps SDK** (Android + iOS) and **Places API** enabled
+- **For local Android builds:** JDK 17, Android SDK, and an Android emulator (Pixel 9 AVD recommended)
 
 ---
 
@@ -162,26 +162,52 @@ In the Supabase Dashboard → Database → Webhooks, create one webhook per Edge
 
 ## Development
 
-```bash
-# Start Metro bundler
-npm start
+### Local Android (recommended for day-to-day dev)
 
-# Expo Go is NOT supported — use a dev build (see Building section)
+Requires JDK 17 and an Android emulator. Builds locally — no EAS account needed.
+
+```bash
+# First run: compiles all native modules (~25 min). Subsequent runs use Gradle cache (~2 min).
+npx expo run:android
 ```
 
-> **Expo Go will not work.** `react-native-maps`, `expo-notifications`, and OAuth deep links all require a custom native build.
+The Expo Dev Client shell is installed on the emulator and Metro starts automatically. On subsequent runs the native build is skipped and only the JS bundle is reloaded.
 
----
+### Web preview (UI only — no maps, location, or push)
 
-## Building
+Useful for quickly iterating on screens that don't require native APIs.
 
-### Android (sideload APK — works on Windows)
+```bash
+npx expo export --platform web
+npx serve dist
+# Open http://localhost:3000
+```
+
+### EAS cloud build (no local Android SDK required)
 
 ```bash
 eas build --platform android --profile development
 ```
 
-Download and sideload the APK onto a physical Android device or emulator.
+> **Expo Go will not work.** `react-native-maps`, `expo-notifications`, and OAuth deep links all require a custom native build.
+
+### Authentication in development
+
+The sign-in screen supports **Google OAuth**, **Apple Sign In**, and **Email/Password**. For development and beta testing, add users directly in the Supabase Dashboard → **Authentication → Users → Add user**. The `handle_new_user` trigger auto-creates the matching `profiles` row.
+
+To skip email confirmation during development: Supabase Dashboard → **Authentication → Providers → Email → disable "Confirm email"**.
+
+---
+
+## Building
+
+### Android dev build (sideload APK — works on Windows without local SDK)
+
+```bash
+eas build --platform android --profile development
+```
+
+Download and sideload the APK onto a physical Android device or emulator. For local builds with the Android SDK installed, use `npx expo run:android` instead (faster iteration).
 
 ### iOS (requires Apple Developer account + registered UDID)
 

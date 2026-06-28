@@ -100,6 +100,41 @@ export function useGroupMembers(groupId: string) {
   });
 }
 
+export function useUpdateMemberRole(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: 'admin' | 'member' }) => {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ role })
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, groupId, 'members'] });
+    },
+  });
+}
+
+export function useRemoveMember(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, groupId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    },
+  });
+}
+
 export function useInviteLink(groupId: string) {
   return useQuery({
     queryKey: [QUERY_KEY, groupId, 'invite'],
