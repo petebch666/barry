@@ -12,7 +12,8 @@ export function GlassCard({ children, style, intensity = 50, ...props }: GlassCa
       <BlurView
         tint="dark"
         intensity={intensity}
-        style={StyleSheet.absoluteFill}
+        style={styles.absoluteFillNoEvents}
+        pointerEvents="none"
       />
       <View style={styles.overlay} />
       <View style={styles.content}>{children}</View>
@@ -27,6 +28,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  // pointerEvents in style for RN Web; pointerEvents prop on BlurView for native.
+  absoluteFillNoEvents: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
   overlay: {
     position: 'absolute',
     top: 0,
@@ -34,6 +44,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: colors.surface,
+    pointerEvents: 'none',
   },
   content: { flex: 1 },
 });

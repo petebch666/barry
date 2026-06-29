@@ -12,7 +12,7 @@ import type { Group } from '@/schemas';
 
 export default function CreatePingModal() {
   const router = useRouter();
-  const { data: groups } = useGroups();
+  const { data: groups, isLoading: groupsLoading } = useGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const { mutateAsync: createPing, isPending } = useCreatePing();
@@ -66,28 +66,44 @@ export default function CreatePingModal() {
 
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>Ping which group? *</Text>
-          <View style={styles.groupList}>
-            {(groups ?? []).map((group: Group) => (
+          {!groupsLoading && (groups ?? []).length === 0 ? (
+            <View style={styles.noGroupBox}>
+              <Text style={styles.noGroupText}>
+                You need a group before you can ping.
+              </Text>
               <TouchableOpacity
-                key={group.id}
-                style={[
-                  styles.groupChip,
-                  selectedGroupId === group.id && styles.groupChipSelected,
-                ]}
-                onPress={() => setSelectedGroupId(group.id)}
+                style={styles.noGroupBtn}
+                onPress={() => router.push('/create-group')}
                 accessibilityRole="button"
-                accessibilityLabel={`Select group: ${group.name}`}
-                accessibilityState={{ selected: selectedGroupId === group.id }}
+                accessibilityLabel="Create your first group"
               >
-                <Text style={[
-                  styles.groupChipText,
-                  selectedGroupId === group.id && styles.groupChipTextSelected,
-                ]}>
-                  {group.name}
-                </Text>
+                <Text style={styles.noGroupBtnText}>Create your first group →</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.groupList}>
+              {(groups ?? []).map((group: Group) => (
+                <TouchableOpacity
+                  key={group.id}
+                  style={[
+                    styles.groupChip,
+                    selectedGroupId === group.id && styles.groupChipSelected,
+                  ]}
+                  onPress={() => setSelectedGroupId(group.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select group: ${group.name}`}
+                  accessibilityState={{ selected: selectedGroupId === group.id }}
+                >
+                  <Text style={[
+                    styles.groupChipText,
+                    selectedGroupId === group.id && styles.groupChipTextSelected,
+                  ]}>
+                    {group.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.label}>Message *</Text>
           <TextInput
@@ -156,8 +172,33 @@ const styles = StyleSheet.create({
   groupChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   groupChipText: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
   groupChipTextSelected: { color: colors.accent, fontWeight: '600' },
+  noGroupBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  noGroupText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  noGroupBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+  },
+  noGroupBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.sm,

@@ -23,7 +23,7 @@ function GlassTabBar({ state, navigation }: BottomTabBarProps) {
       pointerEvents="box-none"
     >
       <View style={styles.tabBarInner}>
-        <BlurView tint="dark" intensity={65} style={StyleSheet.absoluteFill} />
+        <BlurView tint="dark" intensity={65} style={styles.absoluteFillNoEvents} pointerEvents="none" />
         <View style={styles.tabBarOverlay} />
         {TABS.map((tab) => {
           const routeIndex = state.routes.findIndex((r) => r.name === tab.name);
@@ -87,6 +87,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+  absoluteFillNoEvents: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
   tabBarOverlay: {
     position: 'absolute',
     top: 0,
@@ -94,6 +102,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(18,14,28,0.55)',
+    pointerEvents: 'none',
   },
   tabItem: {
     flex: 1,

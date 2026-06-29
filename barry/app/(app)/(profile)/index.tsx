@@ -250,33 +250,35 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowJoinModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView tint="dark" intensity={60} style={StyleSheet.absoluteFill} />
+          <BlurView tint="dark" intensity={60} style={styles.absoluteFillNoEvents} pointerEvents="none" />
           <View style={styles.modalBox}>
-            <BlurView tint="dark" intensity={50} style={StyleSheet.absoluteFill} />
+            <BlurView tint="dark" intensity={50} style={styles.absoluteFillNoEvents} pointerEvents="none" />
             <View style={styles.modalBg} />
-            <Text style={styles.modalTitle}>Join with invite code</Text>
-            <TextInput
-              style={styles.codeInput}
-              placeholder="Enter 8-character code"
-              placeholderTextColor={colors.textTertiary}
-              value={inviteCode}
-              onChangeText={setInviteCode}
-              autoCapitalize="characters"
-              maxLength={8}
-              autoFocus
-            />
-            <GlassButton
-              label="Join group"
-              loading={isJoining}
-              onPress={handleJoin}
-              style={{ marginTop: 4 }}
-            />
-            <TouchableOpacity
-              onPress={() => { setShowJoinModal(false); setInviteCode(''); }}
-              accessibilityRole="button"
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Join with invite code</Text>
+              <TextInput
+                style={styles.codeInput}
+                placeholder="Enter 8-character code"
+                placeholderTextColor={colors.textTertiary}
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="characters"
+                maxLength={8}
+                autoFocus
+              />
+              <GlassButton
+                label="Join group"
+                loading={isJoining}
+                onPress={handleJoin}
+                style={{ marginTop: 4 }}
+              />
+              <TouchableOpacity
+                onPress={() => { setShowJoinModal(false); setInviteCode(''); }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -462,6 +464,14 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 14,
   },
+  absoluteFillNoEvents: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
   modalBg: {
     position: 'absolute',
     top: 0,
@@ -469,7 +479,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(18,14,28,0.7)',
+    pointerEvents: 'none',
   },
+  modalContent: { position: 'relative', gap: 14 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
   codeInput: {
     height: 50,

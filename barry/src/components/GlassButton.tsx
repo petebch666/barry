@@ -46,8 +46,13 @@ export function GlassButton({
     >
       {isGhost && (
         <>
-          <BlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, styles.ghostOverlay]} />
+          <BlurView
+            tint="dark"
+            intensity={40}
+            style={styles.absoluteFillNoEvents}
+            pointerEvents="none"
+          />
+          <View style={styles.ghostOverlay} />
         </>
       )}
       {loading ? (
@@ -76,7 +81,23 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: 'transparent',
   },
-  ghostOverlay: { backgroundColor: colors.surface },
+  absoluteFillNoEvents: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+  },
+  ghostOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+    pointerEvents: 'none',
+  },
   disabled: { opacity: 0.45 },
   label: { color: colors.text, fontSize: 16, fontWeight: '600' },
   labelSm: { fontSize: 14 },
