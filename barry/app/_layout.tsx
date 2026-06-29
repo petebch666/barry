@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -32,6 +33,9 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
         <AuthGate />
+        <View pointerEvents="none" style={styles.wordmarkContainer}>
+          <Text style={styles.wordmark}>barry</Text>
+        </View>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );
@@ -112,3 +116,19 @@ function AuthGate() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  wordmarkContainer: {
+    position: 'absolute',
+    top: Platform.select({ ios: 52, android: 28, default: 10 }),
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  wordmark: {
+    fontFamily: Platform.OS === 'web' ? '"Comic Sans MS", cursive' : 'Comic Sans MS',
+    fontSize: 22,
+    color: '#782687',
+  },
+});
