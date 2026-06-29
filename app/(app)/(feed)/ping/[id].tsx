@@ -8,11 +8,13 @@ import { usePlaces, usePlacesRealtime } from '@/hooks/usePlaces';
 import { useVotes, useVotesRealtime, useCastVote, useMyVote, useVoteCounts } from '@/hooks/useVotes';
 import { useSavePlace } from '@/hooks/useProfile';
 import { computeBarycenter, haversineMeters } from '@/utils/barycenter';
+import { openDirections } from '@/utils/openDirections';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
 import { Badge } from '@/components/Badge';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
 import PingMap from '@/components/PingMap';
+import { MapErrorBoundary } from '@/components/MapErrorBoundary';
 import type { Place } from '@/schemas';
 
 export default function PingDetailScreen() {
@@ -152,20 +154,22 @@ export default function PingDetailScreen() {
 
           {/* Map (native only via platform-specific file) */}
           {barycenter && (
-            <PingMap
-              barycenter={barycenter}
-              memberLocations={inRsvpsWithLocation.map((r) => ({
-                id: r.id,
-                latitude: r.latitude!,
-                longitude: r.longitude!,
-              }))}
-              places={places.map((p) => ({
-                id: p.id,
-                latitude: p.latitude,
-                longitude: p.longitude,
-                name: p.name,
-              }))}
-            />
+            <MapErrorBoundary>
+              <PingMap
+                barycenter={barycenter}
+                memberLocations={inRsvpsWithLocation.map((r) => ({
+                  id: r.id,
+                  latitude: r.latitude!,
+                  longitude: r.longitude!,
+                }))}
+                places={places.map((p) => ({
+                  id: p.id,
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  name: p.name,
+                }))}
+              />
+            </MapErrorBoundary>
           )}
 
           {/* Start voting */}
@@ -366,6 +370,17 @@ function PlaceCard({
           )}
         </TouchableOpacity>
       </View>
+
+      {isConfirmed && (
+        <TouchableOpacity
+          style={styles.directionsBtn}
+          onPress={() => openDirections(place.latitude, place.longitude, place.name)}
+          accessibilityRole="button"
+          accessibilityLabel={`Get directions to ${place.name}`}
+        >
+          <Text style={styles.directionsBtnText}>Get directions →</Text>
+        </TouchableOpacity>
+      )}
     </GlassCard>
   );
 }
@@ -446,6 +461,14 @@ const styles = StyleSheet.create({
   voteCount: { fontSize: 12, color: colors.textTertiary },
   saveIcon: { fontSize: 20, color: colors.textTertiary },
   saveIconSaved: { color: colors.error },
+  directionsBtn: {
+    marginTop: 8,
+    backgroundColor: colors.accentSoft,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  directionsBtnText: { fontSize: 14, fontWeight: '600', color: colors.accent },
   dangerBtn: {
     borderWidth: 1,
     borderColor: colors.error,
