@@ -107,6 +107,13 @@ export function useCreatePing() {
         .single();
 
       if (error) throw error;
+
+      // Creator is implicitly "in" — auto-RSVP so they're counted without extra steps.
+      // Location is null here; the ping detail prompts them to share it.
+      await supabase
+        .from('rsvps')
+        .insert({ ping_id: data.id, user_id: user.id, status: 'in' });
+
       return data as Ping;
     },
     onSuccess: (ping) => {

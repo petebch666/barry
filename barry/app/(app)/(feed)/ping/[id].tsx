@@ -106,6 +106,15 @@ export default function PingDetailScreen() {
             </View>
           )}
 
+          {/* Location nudge — shown when user is 'in' but hasn't shared location yet */}
+          {myRsvp?.status === 'in' && !myRsvp.latitude && ping.status === 'open' && (
+            <GlassButton
+              label="Share your location →"
+              onPress={() => router.push(`/rsvp/${pingId}`)}
+              accessibilityLabel="Share your location to help compute the meeting point"
+            />
+          )}
+
           {/* Map (native only via platform-specific file) */}
           {barycenter && (
             <PingMap
