@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { colors, BARRY_HEADER_HEIGHT } from '@/lib/theme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
@@ -32,10 +33,10 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        <AuthGate />
-        <View pointerEvents="none" style={styles.wordmarkContainer}>
-          <Text style={styles.wordmark}>barry</Text>
+        <View style={styles.barryHeader}>
+          <Text style={styles.barryText}>barry</Text>
         </View>
+        <AuthGate />
       </GestureHandlerRootView>
     </QueryClientProvider>
   );
@@ -118,17 +119,20 @@ function AuthGate() {
 }
 
 const styles = StyleSheet.create({
-  wordmarkContainer: {
-    position: 'absolute',
-    top: Platform.select({ ios: 52, android: 28, default: 10 }),
-    left: 0,
-    right: 0,
+  barryHeader: {
+    height: BARRY_HEADER_HEIGHT,
+    paddingTop: Platform.select({ ios: 52, android: 28, default: 0 }),
+    backgroundColor: '#000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fff',
     alignItems: 'center',
-    zIndex: 9999,
+    justifyContent: 'center',
   },
-  wordmark: {
+  barryText: {
     fontFamily: Platform.OS === 'web' ? '"Comic Sans MS", cursive' : 'Comic Sans MS',
-    fontSize: 22,
-    color: '#782687',
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: colors.accent,
+    lineHeight: 46,
   },
 });

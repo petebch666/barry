@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const colors = {
   bg: '#000000',
   surface: 'rgba(255,255,255,0.06)',
@@ -19,3 +21,6 @@ export const font = { xs: 12, sm: 14, md: 16, lg: 20, xl: 28, xxl: 36 } as const
 
 // Vertical space content must clear above the floating tab bar (tab bar height + margin + max safe area)
 export const BOTTOM_TAB_PADDING = 120;
+
+// Height of the barry header bar at the top of every screen (includes status-bar safe area on native)
+export const BARRY_HEADER_HEIGHT = Platform.select({ ios: 104, android: 80, default: 64 }) as number;

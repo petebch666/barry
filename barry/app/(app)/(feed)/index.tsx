@@ -5,6 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,16 +13,19 @@ import { useFeedPings } from '@/hooks/usePings';
 import { useGroups } from '@/hooks/useGroups';
 import { GlassCard } from '@/components/GlassCard';
 import { Badge } from '@/components/Badge';
-import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
+import { colors, BOTTOM_TAB_PADDING, BARRY_HEADER_HEIGHT } from '@/lib/theme';
 import type { Ping } from '@/schemas';
 
 export default function FeedScreen() {
   const router = useRouter();
   const { data: pings, isLoading, refetch, isRefetching } = useFeedPings();
   const { data: groups, isLoading: groupsLoading } = useGroups();
+  const { height } = useWindowDimensions();
 
   const hasGroups = (groups?.length ?? 0) > 0;
   const initialized = !isLoading && !groupsLoading;
+  // Hero fills the viewport below the barry header so the orb sits at screen centre
+  const heroHeight = height - BARRY_HEADER_HEIGHT;
 
   function handlePingPress() {
     router.push('/create-ping');
@@ -49,6 +53,7 @@ export default function FeedScreen() {
               initialized={initialized}
               onPingPress={handlePingPress}
               onCreateGroup={() => router.push('/create-group')}
+              heroHeight={heroHeight}
             />
           }
           ListEmptyComponent={
@@ -76,14 +81,16 @@ function PingHero({
   initialized,
   onPingPress,
   onCreateGroup,
+  heroHeight,
 }: {
   hasGroups: boolean;
   initialized: boolean;
   onPingPress: () => void;
   onCreateGroup: () => void;
+  heroHeight: number;
 }) {
   return (
-    <View style={styles.hero}>
+    <View style={[styles.hero, { height: heroHeight }]}>
       <TouchableOpacity
         style={[styles.orb, !hasGroups && initialized && styles.orbDim]}
         onPress={hasGroups ? onPingPress : onCreateGroup}
@@ -156,11 +163,10 @@ const styles = StyleSheet.create({
     paddingBottom: BOTTOM_TAB_PADDING,
   },
 
-  // Hero section
+  // Hero section — height is set dynamically so the orb lands at screen centre
   hero: {
     alignItems: 'center',
-    paddingTop: 48,
-    paddingBottom: 36,
+    justifyContent: 'center',
     gap: 16,
   },
   orb: {
