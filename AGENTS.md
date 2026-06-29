@@ -13,13 +13,12 @@ Do not rely on training-data knowledge of Expo APIs — check the docs.
 ## Repository layout
 
 ```
-C:\dev\barry\          ← git root (run git commands here)
-└── barry\             ← Expo project root (run npm / expo / supabase commands here)
-    ├── app\           ← Expo Router v3 file-based routes
-    ├── src\           ← hooks, lib, schemas, types, utils
-    ├── supabase\      ← migrations, Edge Functions, pgTAP tests
-    ├── CLAUDE.md      ← full dev instructions (read this too)
-    └── eas.json
+C:\dev\barry\          ← git root and Expo project root (run all commands here)
+├── app\               ← Expo Router v3 file-based routes
+├── src\               ← hooks, lib, schemas, types, utils
+├── supabase\          ← migrations, Edge Functions, pgTAP tests
+├── CLAUDE.md          ← full dev instructions (read this too)
+└── eas.json
 ```
 
 ---

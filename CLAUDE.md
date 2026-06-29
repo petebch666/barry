@@ -4,11 +4,9 @@
 
 ## Repository layout
 
-The git root is `C:\dev\barry`. The Expo project lives one level down at `C:\dev\barry\barry`.
+The git root and Expo project root are both `C:\dev\barry`.
 
-- Run **npm / expo / jest** commands from `C:\dev\barry\barry`
-- Run **git** commands from `C:\dev\barry`
-- Run **supabase** commands from `C:\dev\barry\barry` (that's where `supabase/config.toml` lives)
+- Run **all commands** (npm / expo / jest / git / supabase) from `C:\dev\barry`
 
 ## Essential commands
 
@@ -23,6 +21,8 @@ npm run test:watch
 # Deno Edge Function tests
 deno test supabase/functions/check-vote-majority/check-vote-majority.test.ts
 deno test supabase/functions/fetch-nearby-places/fetch-nearby-places.test.ts
+deno test supabase/functions/notify-ping-cancelled/notify-ping-cancelled.test.ts
+deno test supabase/functions/notify-rsvp-change/notify-rsvp-change.test.ts
 
 # DB/RLS tests
 npx supabase start
