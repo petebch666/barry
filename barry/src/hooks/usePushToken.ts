@@ -55,6 +55,8 @@ export async function registerPushToken(userId: string): Promise<boolean> {
  * Call this before supabase.auth.signOut().
  */
 export async function deregisterPushToken(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
   const projectId = getProjectId();
   if (!projectId) return;
 

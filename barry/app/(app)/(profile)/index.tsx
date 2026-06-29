@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,18 +62,22 @@ export default function ProfileScreen() {
     }
   }
 
+  async function performSignOut() {
+    try { await deregisterPushToken(); } catch {}
+    await supabase.removeAllChannels();
+    await supabase.auth.signOut();
+  }
+
   async function signOut() {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to sign out?')) {
+        await performSignOut();
+      }
+      return;
+    }
     Alert.alert('Sign out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await deregisterPushToken();
-          await supabase.removeAllChannels();
-          await supabase.auth.signOut();
-        },
-      },
+      { text: 'Sign out', style: 'destructive', onPress: performSignOut },
     ]);
   }
 
