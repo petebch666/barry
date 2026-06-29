@@ -142,10 +142,10 @@ export function useGroupByInviteCode(code: string) {
     queryKey: [QUERY_KEY, 'invite', code],
     queryFn: async () => {
       if (!code || code.length !== 8) return null;
+      // RPC bypasses the members-only SELECT policy so non-members can
+      // resolve the group name before joining.
       const { data, error } = await supabase
-        .from('groups')
-        .select('id, name, description')
-        .eq('invite_code', code.toUpperCase())
+        .rpc('lookup_group_by_invite_code', { code: code.toUpperCase() })
         .single();
       if (error) return null;
       return data as Pick<Group, 'id' | 'name' | 'description'>;
@@ -165,9 +165,7 @@ export function useJoinGroup() {
       if (!user) throw new Error('Not authenticated');
 
       const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .select('id, name')
-        .eq('invite_code', inviteCode.toUpperCase())
+        .rpc('lookup_group_by_invite_code', { code: inviteCode.toUpperCase() })
         .single();
 
       if (groupError || !group) throw new Error('Invalid invite code');

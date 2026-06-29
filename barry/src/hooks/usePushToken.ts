@@ -17,6 +17,8 @@ function getProjectId(): string | undefined {
  * the EAS project ID is unavailable (bare dev).
  */
 export async function registerPushToken(userId: string): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+
   const projectId = getProjectId();
   if (!projectId) return false;
 
