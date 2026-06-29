@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { usePing, usePingRealtime, useStartVoting } from '@/hooks/usePings';
-import { useRsvps, useRsvpsRealtime, useMyRsvp } from '@/hooks/useRsvps';
+import { usePing, usePingRealtime, useStartVoting, useCancelPing } from '@/hooks/usePings';
+import { useRsvps, useRsvpsRealtime, useMyRsvp, useUpsertRsvp } from '@/hooks/useRsvps';
 import { usePlaces, usePlacesRealtime } from '@/hooks/usePlaces';
 import { useVotes, useVotesRealtime, useCastVote, useMyVote, useVoteCounts } from '@/hooks/useVotes';
 import { useSavePlace } from '@/hooks/useProfile';
@@ -32,8 +32,10 @@ export default function PingDetailScreen() {
   useVotesRealtime(pingId);
 
   const { mutateAsync: startVoting, isPending: isStartingVoting } = useStartVoting();
+  const { mutateAsync: cancelPing, isPending: isCancelling } = useCancelPing();
   const { mutateAsync: castVote, isPending: isCasting } = useCastVote();
   const { mutateAsync: savePlace } = useSavePlace();
+  const { mutateAsync: upsertRsvp } = useUpsertRsvp();
 
   const inRsvpsWithLocation = rsvps.filter(
     (r) => r.status === 'in' && r.latitude != null && r.longitude != null,
@@ -56,6 +58,39 @@ export default function PingDetailScreen() {
   const isCreator = ping.created_by === myRsvp?.user_id;
   const canStartVoting = ping.status === 'open' && inCount >= 2;
   const isConfirmed = ping.status === 'confirmed';
+  const isActive = ping.status === 'open' || ping.status === 'voting';
+
+  async function handleCancelPing() {
+    const doCancel = () => cancelPing(pingId);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Cancel this ping? All members will be notified.')) doCancel();
+    } else {
+      Alert.alert(
+        'Cancel ping',
+        'All members will be notified. This cannot be undone.',
+        [
+          { text: 'Keep it', style: 'cancel' },
+          { text: 'Cancel ping', style: 'destructive', onPress: doCancel },
+        ],
+      );
+    }
+  }
+
+  async function handleLeavePing() {
+    const doLeave = () => upsertRsvp({ ping_id: pingId, status: 'out', location: null });
+    if (Platform.OS === 'web') {
+      if (window.confirm('Leave this ping? Others may be notified if the meeting point shifts.')) doLeave();
+    } else {
+      Alert.alert(
+        'Leave ping',
+        'Others may be notified if the meeting point shifts significantly.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: doLeave },
+        ],
+      );
+    }
+  }
 
   return (
     <View style={styles.root}>
@@ -194,6 +229,33 @@ export default function PingDetailScreen() {
               <ActivityIndicator color={colors.accent} />
               <Text style={styles.loadingPlacesText}>Finding places near your meeting point…</Text>
             </View>
+          )}
+
+          {/* Cancel ping — creator only, while still active */}
+          {isCreator && isActive && (
+            <TouchableOpacity
+              style={[styles.dangerBtn, isCancelling && { opacity: 0.5 }]}
+              onPress={handleCancelPing}
+              disabled={isCancelling}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel this ping"
+            >
+              {isCancelling
+                ? <ActivityIndicator color={colors.error} />
+                : <Text style={styles.dangerBtnText}>Cancel ping</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* Leave ping — non-creator 'in' members, while still active */}
+          {!isCreator && myRsvp?.status === 'in' && isActive && (
+            <TouchableOpacity
+              style={styles.dangerBtn}
+              onPress={handleLeavePing}
+              accessibilityRole="button"
+              accessibilityLabel="Leave this ping"
+            >
+              <Text style={styles.dangerBtnText}>Leave ping</Text>
+            </TouchableOpacity>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -384,4 +446,12 @@ const styles = StyleSheet.create({
   voteCount: { fontSize: 12, color: colors.textTertiary },
   saveIcon: { fontSize: 20, color: colors.textTertiary },
   saveIconSaved: { color: colors.error },
+  dangerBtn: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  dangerBtnText: { fontSize: 15, fontWeight: '500', color: colors.error },
 });

@@ -123,6 +123,24 @@ export function useCreatePing() {
   });
 }
 
+export function useCancelPing() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pingId: string) => {
+      const { error } = await supabase
+        .from('pings')
+        .update({ status: 'cancelled' })
+        .eq('id', pingId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, pingId) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, pingId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'feed'] });
+    },
+  });
+}
+
 export function useStartVoting() {
   const queryClient = useQueryClient();
 
