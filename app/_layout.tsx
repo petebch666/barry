@@ -16,6 +16,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -33,9 +35,6 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        <View style={styles.barryHeader}>
-          <Text style={styles.barryText}>barry</Text>
-        </View>
         <AuthGate />
       </GestureHandlerRootView>
     </QueryClientProvider>
@@ -53,6 +52,7 @@ function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
   const redirecting = useRef(false);
+  const inAuthGroup = segments[0] === '(auth)';
 
   // Register push token whenever we have a signed-in user
   usePushTokenRegistration(session?.user?.id ?? null);
@@ -74,8 +74,6 @@ function AuthGate() {
   // ── Route guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialized || redirecting.current) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
 
     if (!session && !inAuthGroup) {
       redirecting.current = true;
@@ -105,6 +103,12 @@ function AuthGate() {
   }, [router]);
 
   return (
+    <>
+      {!inAuthGroup && (
+        <View style={styles.barryHeader}>
+          <Text style={styles.barryText}>barry</Text>
+        </View>
+      )}
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
@@ -115,6 +119,7 @@ function AuthGate() {
       <Stack.Screen name="join/[code]" />
       <Stack.Screen name="invite/[groupId]" options={{ presentation: 'modal' }} />
     </Stack>
+    </>
   );
 }
 
