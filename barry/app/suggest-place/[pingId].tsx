@@ -74,7 +74,7 @@ export default function SuggestPlaceModal() {
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <View style={styles.tipBox}>
             <Text style={styles.tip}>
-              Tip: Open Google Maps, find the place, tap "Share" → copy the coordinates.
+              Tip: Find the venue on any map app or openstreetmap.org, then copy its coordinates here.
             </Text>
           </View>
 

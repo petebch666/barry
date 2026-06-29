@@ -38,7 +38,7 @@ C:\dev\barry\          ← git root (run git commands here)
 ### Security (non-negotiable)
 - The **service role key** must never appear in any client-side file. It lives only in Edge Function env vars.
 - **RLS must be enabled** on every new table. Add policies to `supabase/migrations/002_rls_policies.sql`.
-- The **Google Places API key** is stored in Supabase Vault only (`npx supabase secrets set`). It must never appear in `app.json`, `.env.local`, source files, or git history.
+- **Place data uses OpenStreetMap/Overpass API** — no API key required. Do not add Google Places API calls.
 - **`flowType: 'pkce'`** must remain set in `src/lib/supabase.ts`. Do not change auth flow.
 - Location data (`rsvps.latitude`, `rsvps.longitude`) must not be persisted beyond ping lifecycle — the pg_cron nullification in `supabase/migrations/003_triggers.sql` is load-bearing.
 

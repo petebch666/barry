@@ -25,10 +25,10 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 }
 
 interface SavedPlace { latitude: number; longitude: number; name: string; user_id: string; }
-interface GooglePlace { latitude: number; longitude: number; }
+interface OsmPlace { latitude: number; longitude: number; }
 
 function mergeSavedPlaces(
-  googlePlaces: GooglePlace[],
+  osmPlaces: OsmPlace[],
   savedPlaces: SavedPlace[],
   barycenter: LatLng,
   searchRadius: number,
@@ -37,8 +37,8 @@ function mergeSavedPlaces(
   return savedPlaces.filter((sp) => {
     const distFromCenter = haversineMeters(barycenter, sp);
     if (distFromCenter > searchRadius * 2) return false;
-    const tooClose = googlePlaces.some(
-      (gp) => haversineMeters(gp, sp) < dedupeThresholdM,
+    const tooClose = osmPlaces.some(
+      (op) => haversineMeters(op, sp) < dedupeThresholdM,
     );
     return !tooClose;
   });
@@ -87,38 +87,36 @@ Deno.test('merge — saved place beyond 2× radius is excluded', () => {
   assertEquals(merged.length, 0);
 });
 
-Deno.test('merge — saved place within 50 m of Google result is deduplicated', () => {
+Deno.test('merge — saved place within 50 m of OSM result is deduplicated', () => {
   const barycenter = { latitude: 48.860, longitude: 2.350 };
   const RADIUS = 800;
-  // Google result at barycenter
-  const googlePlace = { latitude: 48.860, longitude: 2.350 };
-  // Saved place 30 m away from Google result → deduped
+  const osmPlace = { latitude: 48.860, longitude: 2.350 };
+  // Saved place 30 m away from OSM result → deduped
   const sp = { latitude: 48.8603, longitude: 2.3504, name: 'Same Bar', user_id: 'u1' };
-  const merged = mergeSavedPlaces([googlePlace], [sp], barycenter, RADIUS);
+  const merged = mergeSavedPlaces([osmPlace], [sp], barycenter, RADIUS);
   assertEquals(merged.length, 0);
 });
 
-Deno.test('merge — saved place 60 m from Google result is kept', () => {
+Deno.test('merge — saved place 60 m from OSM result is kept', () => {
   const barycenter = { latitude: 48.860, longitude: 2.350 };
   const RADIUS = 800;
-  // Google result at barycenter
-  const googlePlace = { latitude: 48.860, longitude: 2.350 };
-  // Saved place ~60 m away from Google result → different venue, kept
+  const osmPlace = { latitude: 48.860, longitude: 2.350 };
+  // Saved place ~60 m away from OSM result → different venue, kept
   const sp = { latitude: 48.8605, longitude: 2.351, name: 'Different Bar', user_id: 'u1' };
-  const merged = mergeSavedPlaces([googlePlace], [sp], barycenter, RADIUS);
+  const merged = mergeSavedPlaces([osmPlace], [sp], barycenter, RADIUS);
   assertEquals(merged.length, 1);
 });
 
 Deno.test('merge — multiple saved places filtered correctly', () => {
   const barycenter = { latitude: 48.860, longitude: 2.350 };
   const RADIUS = 800;
-  const googlePlaces = [{ latitude: 48.861, longitude: 2.351 }];
+  const osmPlaces = [{ latitude: 48.861, longitude: 2.351 }];
   const saved = [
     { latitude: 48.863, longitude: 2.355, name: 'Good Place', user_id: 'u1' },   // within radius, not deduped
     { latitude: 48.905, longitude: 2.350, name: 'Too Far', user_id: 'u2' },       // beyond 2× radius
-    { latitude: 48.8611, longitude: 2.3511, name: 'Near Google', user_id: 'u3' }, // within 50 m of google
+    { latitude: 48.8611, longitude: 2.3511, name: 'Near OSM result', user_id: 'u3' }, // within 50 m of OSM
   ];
-  const merged = mergeSavedPlaces(googlePlaces, saved, barycenter, RADIUS);
+  const merged = mergeSavedPlaces(osmPlaces, saved, barycenter, RADIUS);
   assertEquals(merged.length, 1);
   assertEquals(merged[0].name, 'Good Place');
 });

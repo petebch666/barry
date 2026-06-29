@@ -6,7 +6,7 @@ import { z } from 'zod';
 const SavePlaceInputSchema = SavedPlaceSchema.pick({
   name: true, address: true, latitude: true, longitude: true, category: true,
 }).extend({
-  google_place_id: z.string().nullable().optional(),
+  osm_id: z.string().nullable().optional(),
 });
 
 const QUERY_KEY = 'profile';

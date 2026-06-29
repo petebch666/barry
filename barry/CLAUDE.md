@@ -80,11 +80,10 @@ supabase/
 
 1. **Service role key never on the client.** It exists only in Edge Function environment variables. The client uses the anon key only.
 2. **RLS on every table, no exceptions.** New tables must have RLS enabled and policies added to `002_rls_policies.sql` before shipping.
-3. **Google Places API key in Supabase Vault only.** Never in `app.json`, `.env.local`, or any file tracked by git. Set with `npx supabase secrets set GOOGLE_PLACES_KEY=...`.
-4. **The Google Maps SDK key** (client-side, for map rendering only) must be restricted in Google Cloud Console to the app bundle ID and granted no Places/other API access.
-5. **PKCE flow** — `flowType: 'pkce'` must remain set in `src/lib/supabase.ts`. Do not switch to `implicit`.
-6. **Location data minimal retention** — `rsvps.latitude` and `rsvps.longitude` are nullified by pg_cron after a ping reaches a terminal state. Do not add queries that persist or export location beyond the ping lifecycle.
-7. **Input validation** — all user-supplied text must pass through the relevant Zod schema before any DB write. Max lengths are enforced at both schema and DB level.
+3. **Place data comes from OpenStreetMap via the Overpass API** — no API key required. Do not re-introduce Google Places API.
+4. **PKCE flow** — `flowType: 'pkce'` must remain set in `src/lib/supabase.ts`. Do not switch to `implicit`.
+5. **Location data minimal retention** — `rsvps.latitude` and `rsvps.longitude` are nullified by pg_cron after a ping reaches a terminal state. Do not add queries that persist or export location beyond the ping lifecycle.
+6. **Input validation** — all user-supplied text must pass through the relevant Zod schema before any DB write. Max lengths are enforced at both schema and DB level.
 
 ## Testing requirements
 
@@ -107,7 +106,6 @@ Tests live in:
 - **Expo Go does not work** — `react-native-maps`, push notifications, and OAuth all require a custom EAS dev build.
 - **EAS project ID is required for push tokens** — `getExpoPushTokenAsync` silently returns null without it. Run `eas build:configure` first.
 - **`npx supabase init` exit code 1** — this is a PostHog analytics timeout, not an actual failure. Check that `supabase/config.toml` was created; if it was, proceed normally.
-- **Two Google API keys** — one for Maps SDK (client), one for Places API (server-side Vault only). They must never be swapped.
 - **Apple Sign In only works on a physical device** — cannot be tested in simulator.
 - **Windows + iOS** — no local Xcode. All iOS builds go through EAS. Register device UDID in Apple Developer portal before requesting a dev build.
 - **pg_cron availability** — the triggers migration registers cron jobs conditionally (`IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')`). Enable pg_cron in the Supabase Dashboard under Database → Extensions before running migrations in production.

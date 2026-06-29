@@ -2,8 +2,8 @@
  * Triggered via DB Webhook on UPDATE of pings WHERE status = 'voting'.
  *
  * 1. Reads "in" RSVPs with location for the ping.
- * 2. Computes the barycenter.
- * 3. Calls Google Places Nearby Search API.
+ * 2. Computes the barycenter of member locations.
+ * 3. Queries Overpass API (OpenStreetMap) for bars/restaurants within 800 m.
  * 4. Merges participants' saved_places within 800 m.
  * 5. Inserts results into the places table.
  *
@@ -14,8 +14,17 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 
 const SEARCH_RADIUS_M = 800;
 const MAX_PLACES = 8;
+const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
 interface LatLng { latitude: number; longitude: number; }
+interface OsmElement {
+  type: 'node' | 'way';
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+}
 
 function computeBarycenter(points: LatLng[]): LatLng | null {
   if (!points.length) return null;
@@ -36,23 +45,21 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 Deno.serve(async (req) => {
   try {
     const { record } = await req.json();
-    const { id: pingId, group_id, status } = record as {
+    const { id: pingId, status } = record as {
       id: string; group_id: string; status: string;
     };
 
-    // Only process when transitioning to voting
     if (status !== 'voting') return Response.json({ skipped: true });
 
     const supabase = createServiceClient();
 
-    // Guard: skip if places already exist (idempotency)
+    // Idempotency guard: skip if places already exist for this ping
     const { count } = await supabase
       .from('places')
       .select('id', { count: 'exact', head: true })
       .eq('ping_id', pingId);
     if ((count ?? 0) > 0) return Response.json({ skipped: 'already_fetched' });
 
-    // Get "in" RSVPs with location
     const { data: rsvps } = await supabase
       .from('rsvps')
       .select('user_id, latitude, longitude')
@@ -67,40 +74,65 @@ Deno.serve(async (req) => {
       })),
     );
 
-    // Without location data we cannot suggest places — exit gracefully
     if (!barycenter) return Response.json({ skipped: 'no_location_data' });
 
     const placesToInsert: Record<string, unknown>[] = [];
 
-    // ── Google Places Nearby Search ───────────────────────────────────────
-    const googleKey = Deno.env.get('GOOGLE_PLACES_KEY');
-    if (googleKey) {
-      const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json');
-      url.searchParams.set('location', `${barycenter.latitude},${barycenter.longitude}`);
-      url.searchParams.set('radius', String(SEARCH_RADIUS_M));
-      url.searchParams.set('type', 'bar|restaurant');
-      url.searchParams.set('key', googleKey);
+    // ── OpenStreetMap via Overpass API (free, no key required) ───────────
+    try {
+      const query = [
+        '[out:json][timeout:10];',
+        '(',
+        `  node["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
+        `  way["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
+        ');',
+        'out body center;',
+      ].join('\n');
 
-      const res = await fetch(url.toString());
-      const { results = [] } = await res.json();
+      const res = await fetch(OVERPASS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'BarryApp/1.0',
+        },
+        body: `data=${encodeURIComponent(query)}`,
+      });
 
-      for (const place of results.slice(0, MAX_PLACES)) {
-        placesToInsert.push({
-          ping_id: pingId,
-          name: place.name,
-          address: place.vicinity ?? null,
-          latitude: place.geometry.location.lat,
-          longitude: place.geometry.location.lng,
-          category: place.types?.[0] ?? null,
-          source: 'google_places',
-          external_id: place.place_id,
-          photo_url: place.photos?.[0]
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${googleKey}`
-            : null,
-          rating: place.rating ?? null,
-          suggested_by: null,
-        });
+      if (res.ok) {
+        const { elements = [] } = await res.json() as { elements: OsmElement[] };
+
+        for (const element of elements.slice(0, MAX_PLACES)) {
+          const lat = element.type === 'node' ? element.lat : element.center?.lat;
+          const lon = element.type === 'node' ? element.lon : element.center?.lon;
+          const tags = element.tags ?? {};
+          if (!lat || !lon || !tags.name) continue;
+
+          const addrParts: string[] = [];
+          if (tags['addr:housenumber'] && tags['addr:street']) {
+            addrParts.push(`${tags['addr:housenumber']} ${tags['addr:street']}`);
+          } else if (tags['addr:street']) {
+            addrParts.push(tags['addr:street']);
+          }
+          if (tags['addr:city']) addrParts.push(tags['addr:city']);
+
+          placesToInsert.push({
+            ping_id: pingId,
+            name: tags.name,
+            address: addrParts.join(', ') || null,
+            latitude: lat,
+            longitude: lon,
+            category: tags.amenity ?? null,
+            source: 'osm',
+            external_id: `${element.type}/${element.id}`,
+            photo_url: null,
+            rating: null,
+            suggested_by: null,
+          });
+        }
       }
+    } catch (overpassErr) {
+      console.error('Overpass API error:', overpassErr);
+      // Continue — saved_places are still merged below
     }
 
     // ── Merge participants' saved_places within radius ────────────────────
@@ -113,13 +145,13 @@ Deno.serve(async (req) => {
 
       for (const sp of saved ?? []) {
         const dist = haversineMeters(barycenter, { latitude: sp.latitude, longitude: sp.longitude });
-        if (dist > SEARCH_RADIUS_M * 2) continue; // allow 2× radius for personal favourites
+        if (dist > SEARCH_RADIUS_M * 2) continue;
 
         const alreadyIn = placesToInsert.some((p) =>
           haversineMeters(
             { latitude: p.latitude as number, longitude: p.longitude as number },
             { latitude: sp.latitude, longitude: sp.longitude },
-          ) < 50, // deduplicate if within 50 m of a Google result
+          ) < 50,
         );
         if (!alreadyIn) {
           placesToInsert.push({
@@ -130,7 +162,7 @@ Deno.serve(async (req) => {
             longitude: sp.longitude,
             category: sp.category ?? null,
             source: 'manual',
-            external_id: sp.google_place_id ?? null,
+            external_id: sp.osm_id ?? null,
             photo_url: null,
             rating: null,
             suggested_by: sp.user_id,

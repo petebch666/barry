@@ -78,7 +78,7 @@ export const UpsertRsvpSchema = z.object({
 
 // ─── Places ──────────────────────────────────────────────────────────────────
 
-export const PlaceSourceSchema = z.enum(['google_places', 'manual']);
+export const PlaceSourceSchema = z.enum(['osm', 'manual']);
 
 export const PlaceSchema = z.object({
   id: z.string().uuid(),
@@ -133,7 +133,7 @@ export const SavedPlaceSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   category: z.string().nullable(),
-  google_place_id: z.string().nullable(),
+  osm_id: z.string().nullable(),
   created_at: z.string().datetime(),
 });
 

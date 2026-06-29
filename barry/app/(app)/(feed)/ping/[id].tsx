@@ -161,7 +161,7 @@ export default function PingDetailScreen() {
                       latitude: place.latitude,
                       longitude: place.longitude,
                       category: place.category,
-                      google_place_id: place.external_id,
+                      osm_id: place.external_id,
                     });
                   }}
                 />
