@@ -14,7 +14,11 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 
 const SEARCH_RADIUS_M = 800;
 const MAX_PLACES = 8;
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
 
 interface LatLng { latitude: number; longitude: number; }
 interface OsmElement {
@@ -81,25 +85,34 @@ Deno.serve(async (req) => {
     // ── OpenStreetMap via Overpass API (free, no key required) ───────────
     try {
       const query = [
-        '[out:json][timeout:10];',
+        '[out:json][timeout:25];',
         '(',
-        `  node["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
-        `  way["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
+        `  node["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
+        `  way["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
         ');',
         'out body center;',
       ].join('\n');
 
-      const res = await fetch(OVERPASS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'BarryApp/1.0',
-        },
-        body: `data=${encodeURIComponent(query)}`,
-      });
+      const body = `data=${encodeURIComponent(query)}`;
+      const fetchHeaders = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'BarryApp/1.0 (social meetup app)',
+      };
 
-      if (res.ok) {
+      let res: Response | null = null;
+      for (const mirror of OVERPASS_MIRRORS) {
+        try {
+          res = await fetch(mirror, { method: 'POST', headers: fetchHeaders, body });
+          if (res.ok) break;
+          console.warn(`Overpass mirror ${mirror} returned ${res.status}`);
+        } catch (mirrorErr) {
+          console.warn(`Overpass mirror ${mirror} failed:`, mirrorErr);
+        }
+      }
+
+      if (res?.ok) {
         const { elements = [] } = await res.json() as { elements: OsmElement[] };
+        console.log(`Overpass returned ${elements.length} elements near ${barycenter.latitude},${barycenter.longitude}`);
 
         for (const element of elements.slice(0, MAX_PLACES)) {
           const lat = element.type === 'node' ? element.lat : element.center?.lat;
