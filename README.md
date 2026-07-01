@@ -26,8 +26,8 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 | Language | TypeScript (strict) |
 | Navigation | Expo Router v3 (file-based) |
 | Backend | Supabase (PostgreSQL + Realtime + Edge Functions) |
-| Auth | Google OAuth + Apple Sign In + Email/Password via Supabase |
-| Maps | react-native-maps (native only) |
+| Auth | Apple Sign In + Email/Password via Supabase |
+| Maps | react-native-webview + Leaflet.js + OpenStreetMap tiles (native only) |
 | Places | OpenStreetMap Overpass API (server-side, no API key required) |
 | Location | expo-location (foreground, per-ping opt-in) |
 | Push | expo-notifications + Expo Push API |
@@ -184,11 +184,11 @@ npx expo run:android
 eas build --platform android --profile development
 ```
 
-> **Expo Go will not work.** `react-native-maps`, `expo-notifications`, and OAuth deep links all require a custom native build.
+> **Expo Go will not work.** `react-native-webview`, `expo-notifications`, and OAuth deep links all require a custom native build.
 
 ### Authentication in development
 
-The sign-in screen supports **Google OAuth**, **Apple Sign In**, and **Email/Password**. For development and beta testing, add users directly in the Supabase Dashboard → **Authentication → Users → Add user**. The `handle_new_user` trigger auto-creates the matching `profiles` row.
+The sign-in screen supports **Apple Sign In** and **Email/Password**. For development and beta testing, add users directly in the Supabase Dashboard → **Authentication → Users → Add user**. The `handle_new_user` trigger auto-creates the matching `profiles` row.
 
 To skip email confirmation during development: Supabase Dashboard → **Authentication → Providers → Email → disable "Confirm email"**.
 

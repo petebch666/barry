@@ -61,9 +61,9 @@ Every feature must ship with tests. Refer to CLAUDE.md for test locations and to
 ## What Expo Go cannot do
 
 Expo Go **does not work** for this project. The following features all require a custom EAS dev build:
-- `react-native-maps`
+- `react-native-webview` (maps)
 - `expo-notifications` (push tokens)
-- Google / Apple OAuth deep links (`barry://` scheme)
+- Apple OAuth deep links (`barry://` scheme)
 
 Build with `eas build --platform android --profile development` for a sideloadable APK.
 

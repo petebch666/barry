@@ -103,7 +103,7 @@ Tests live in:
 
 - **Jest 30 breaks jest-expo 56** — `clearMocksOnScope is not a function`. Stay on Jest 29.
 - **`testPathPattern` is a CLI flag**, not a jest config key — use `testMatch` in package.json instead.
-- **Expo Go does not work** — `react-native-maps`, push notifications, and OAuth all require a custom EAS dev build.
+- **Expo Go does not work** — `react-native-webview`, push notifications, and OAuth all require a custom EAS dev build.
 - **EAS project ID is required for push tokens** — `getExpoPushTokenAsync` silently returns null without it. Run `eas build:configure` first.
 - **`npx supabase init` exit code 1** — this is a PostHog analytics timeout, not an actual failure. Check that `supabase/config.toml` was created; if it was, proceed normally.
 - **Apple Sign In only works on a physical device** — cannot be tested in simulator.
