@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, ScrollView, TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +21,7 @@ type LocationMode = 'gps' | 'pin' | 'none';
 
 const LOCATION_MODES: { value: LocationMode; label: string; description: string }[] = [
   { value: 'gps',  label: '📍 Current location', description: 'Share where you are right now' },
-  { value: 'pin',  label: '📌 Pin on map',        description: 'Pick where you\'ll be later' },
+  { value: 'pin',  label: '📌 Set on map',         description: 'Drop a pin where you\'ll be' },
   { value: 'none', label: '🚫 No location',       description: 'Skip — meeting point won\'t update' },
 ];
 
@@ -38,6 +38,9 @@ export default function RsvpModal() {
   const [locationMode, setLocationMode] = useState<LocationMode>('none');
   const [pinnedLocation, setPinnedLocation] = useState<{ latitude: number; longitude: number }>(DEFAULT_REGION);
   const [locating, setLocating] = useState(false);
+  // Web-only fallback for pin mode (no native map available)
+  const [pinLatText, setPinLatText] = useState('');
+  const [pinLngText, setPinLngText] = useState('');
 
   async function submit() {
     let location: { latitude: number; longitude: number } | null = null;
@@ -62,7 +65,17 @@ export default function RsvpModal() {
           setLocating(false);
         }
       } else if (locationMode === 'pin') {
-        location = pinnedLocation;
+        if (Platform.OS === 'web') {
+          const lat = parseFloat(pinLatText);
+          const lng = parseFloat(pinLngText);
+          if (isNaN(lat) || isNaN(lng)) {
+            Alert.alert('Coordinates required', 'Enter valid latitude and longitude.');
+            return;
+          }
+          location = { latitude: lat, longitude: lng };
+        } else {
+          location = pinnedLocation;
+        }
       }
     }
 
@@ -119,9 +132,7 @@ export default function RsvpModal() {
         {selected === 'in' && (
           <View style={styles.locationSection}>
             <Text style={styles.locationSectionTitle}>Location</Text>
-            {LOCATION_MODES.filter(
-              (m) => !(m.value === 'pin' && Platform.OS === 'web'),
-            ).map((mode) => (
+            {LOCATION_MODES.map((mode) => (
               <TouchableOpacity
                 key={mode.value}
                 style={[
@@ -147,7 +158,7 @@ export default function RsvpModal() {
           </View>
         )}
 
-        {/* Map pin picker */}
+        {/* Map pin picker — native */}
         {showMapPicker && (
           <View style={styles.mapPickerWrapper}>
             <Text style={styles.mapPickerHint}>Drag the marker to where you'll be</Text>
@@ -155,6 +166,39 @@ export default function RsvpModal() {
               initialLocation={pinnedLocation}
               onLocationChange={setPinnedLocation}
             />
+          </View>
+        )}
+
+        {/* Coordinate inputs — web fallback for pin mode */}
+        {selected === 'in' && locationMode === 'pin' && Platform.OS === 'web' && (
+          <View style={styles.mapPickerWrapper}>
+            <Text style={styles.mapPickerHint}>Enter the coordinates of where you'll be</Text>
+            <View style={styles.coordRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.coordLabel}>Latitude</Text>
+                <TextInput
+                  style={styles.coordInput}
+                  value={pinLatText}
+                  onChangeText={setPinLatText}
+                  placeholder="48.8566"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel="Latitude"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.coordLabel}>Longitude</Text>
+                <TextInput
+                  style={styles.coordInput}
+                  value={pinLngText}
+                  onChangeText={setPinLngText}
+                  placeholder="2.3522"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel="Longitude"
+                />
+              </View>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -252,6 +296,18 @@ const styles = StyleSheet.create({
   // Map picker
   mapPickerWrapper: { gap: 8 },
   mapPickerHint: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
+  coordRow: { flexDirection: 'row', gap: 12 },
+  coordLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  coordInput: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: colors.text,
+  },
 
   // Footer
   footer: { padding: 20, paddingTop: 8 },
