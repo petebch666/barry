@@ -15,11 +15,27 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 
 const SEARCH_RADIUS_M = 400;
 const MAX_PLACES = 8;
+const MIRROR_TIMEOUT_MS = 8_000;
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
 ];
+
+// Bounds each mirror attempt so a slow/rate-limited mirror (e.g. a 429 that
+// takes a couple of minutes to arrive) can't eat the function's whole
+// wall-clock budget and starve the fallback mirrors — observed in
+// production: overpass-api.de returned 429 after ~2m20s, and the function
+// was killed by the platform before it could try the next mirror.
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface LatLng { latitude: number; longitude: number; }
 interface OsmElement {
@@ -103,11 +119,11 @@ Deno.serve(async (req) => {
       let res: Response | null = null;
       for (const mirror of OVERPASS_MIRRORS) {
         try {
-          res = await fetch(mirror, { method: 'POST', headers: fetchHeaders, body });
+          res = await fetchWithTimeout(mirror, { method: 'POST', headers: fetchHeaders, body }, MIRROR_TIMEOUT_MS);
           if (res.ok) break;
           console.warn(`Overpass mirror ${mirror} returned ${res.status}`);
         } catch (mirrorErr) {
-          console.warn(`Overpass mirror ${mirror} failed:`, mirrorErr);
+          console.warn(`Overpass mirror ${mirror} failed or timed out:`, mirrorErr);
         }
       }
 
