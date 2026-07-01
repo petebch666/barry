@@ -33,6 +33,15 @@ export default function PingDetailScreen() {
   usePlacesRealtime(pingId);
   useVotesRealtime(pingId);
 
+  const inRsvpsWithLocation = rsvps.filter(
+    (r) => r.status === 'in' && r.latitude != null && r.longitude != null,
+  );
+  const barycenter = computeBarycenter(
+    inRsvpsWithLocation.map((r) => ({ latitude: r.latitude!, longitude: r.longitude! })),
+  );
+  const inCount = rsvps.filter((r) => r.status === 'in').length;
+  const totalCount = rsvps.length;
+
   // If the edge function finds nothing (or no one shared a location), the
   // realtime channel never fires. Detect both cases so the spinner doesn't run forever.
   const hasLocationData = inRsvpsWithLocation.length > 0;
@@ -48,16 +57,6 @@ export default function PingDetailScreen() {
   const { mutateAsync: castVote, isPending: isCasting } = useCastVote();
   const { mutateAsync: savePlace } = useSavePlace();
   const { mutateAsync: upsertRsvp } = useUpsertRsvp();
-
-  const inRsvpsWithLocation = rsvps.filter(
-    (r) => r.status === 'in' && r.latitude != null && r.longitude != null,
-  );
-  const barycenter = computeBarycenter(
-    inRsvpsWithLocation.map((r) => ({ latitude: r.latitude!, longitude: r.longitude! })),
-  );
-
-  const inCount = rsvps.filter((r) => r.status === 'in').length;
-  const totalCount = rsvps.length;
 
   if (isLoading || !ping) {
     return (
