@@ -2,18 +2,22 @@
 
 A social meetup coordination app for iOS and Android.
 
-Send a **ping** to a group of friends ("anyone for a drink tonight?"), let everyone RSVP, and let the app figure out where to meet. Barry computes the **geographic barycenter** of all members who are in and suggests nearby venues from OpenStreetMap. The group votes, and when a simple majority agrees, everyone gets a push notification confirming the meetup.
+Send a **ping** to a group of friends ("anyone for a drink tonight?"), let everyone RSVP, and let the app figure out where to meet. Barry computes the **geographic barycenter** of all members who are in and suggests nearby venues from OpenStreetMap. The group votes — with an optional vote timer so early agreement can't lock out slower voters — and everyone gets a push notification once a venue is confirmed.
 
 ---
 
 ## How it works
 
-1. **Ping** — send a ping to one of your groups with a message and optional proposed time
+1. **Ping** — send a ping to one of your groups with a message, an optional proposed time, and an optional **vote timer** (15m/30m/1h/2h)
 2. **RSVP** — members respond in/out/maybe; "in" members can optionally share their current location
 3. **Barycenter** — the app computes the arithmetic mean of all "in" members' locations
-4. **Venue suggestions** — OpenStreetMap venues (800 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list
+4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list
 5. **Vote** — members vote for their preferred venue; any member can also suggest an additional place
-6. **Confirm** — when >50% of "in" members vote for the same venue, the meetup is confirmed and everyone gets a push notification
+6. **Confirm** —
+   - **No vote timer set:** as soon as >50% of "in" members vote for the same venue, the meetup is confirmed.
+   - **Vote timer set:** the majority short-circuit is suppressed so a couple of early voters can't lock out the rest of the group — the meetup only confirms early if *every* "in" member has voted, otherwise it waits for the timer to expire and the plurality leader (tie-broken by barycenter distance) wins.
+
+   Either way, everyone gets a push notification once a venue is confirmed.
 7. **Cancel or leave** — the ping creator can cancel at any time (all RSVP'd members are notified); any "in" member can leave (if their departure shifts the barycenter by more than 1 km, remaining members are notified and new places are suggested)
 
 ---
@@ -63,15 +67,16 @@ barry/                          ← git root and Expo project root
 │   └── utils/                  ← Pure utilities (barycenter, haversine)
 ├── supabase/
 │   ├── migrations/             ← SQL migrations (schema, RLS, triggers)
-│   ├── functions/              ← Deno Edge Functions (triggered by DB Webhooks)
-│   │   ├── _shared/            ← Service role client factory
+│   ├── functions/              ← Deno Edge Functions (DB Webhooks + one cron-scheduled)
+│   │   ├── _shared/            ← Service role client factory + vote-decision logic
 │   │   ├── send-push-notification/
 │   │   ├── notify-group-on-ping/
 │   │   ├── notify-voting-started/
 │   │   ├── notify-ping-cancelled/
 │   │   ├── notify-rsvp-change/
 │   │   ├── fetch-nearby-places/
-│   │   └── check-vote-majority/
+│   │   ├── check-vote-majority/
+│   │   └── finalize-ping-vote/  ← cron-scheduled: confirms pings whose vote timer expired
 │   └── tests/
 │       └── rls.sql             ← pgTAP RLS tests
 ├── app.json
@@ -155,6 +160,19 @@ In the Supabase Dashboard → Database → Webhooks, create one webhook per Edge
 
 > **Important:** `notify-rsvp-change` requires REPLICA IDENTITY FULL on the `rsvps` table so the webhook payload includes the previous row values (`old_record`). Migration 008 enables this automatically.
 
+### 7. Supabase — vote timer cron job
+
+The optional per-ping vote timer relies on `finalize-ping-vote`, which is invoked on a schedule (every minute) rather than by a DB Webhook — the only cron-triggered Edge Function in the project. This needs setup migrations can't do on their own:
+
+1. **Enable `pg_cron` and `pg_net`**: Dashboard → Database → Extensions → enable both.
+2. **Store secrets in Vault** (SQL Editor, run once):
+   ```sql
+   SELECT vault.create_secret('https://<your-project-ref>.supabase.co', 'project_url');
+   SELECT vault.create_secret('<your-service-role-key>', 'service_role_key');
+   ```
+3. **Register the cron jobs.** If `pg_cron`/`pg_net` weren't enabled yet when migrations `003` and `011` ran, their `cron.schedule(...)` calls were silently skipped (gated behind `IF EXISTS (... pg_extension ...)`). Re-run them once via the SQL Editor — see `supabase/migrations/003_triggers.sql` and `supabase/migrations/011_finalize_vote_cron.sql` for the exact statements.
+4. **Verify**: `SELECT jobname, schedule FROM cron.job;` should list `barry-expire-pings`, `barry-nullify-locations`, and `barry-finalize-ping-vote`.
+
 ---
 
 ## Development
@@ -234,6 +252,7 @@ Tests live in `src/**/__tests__/` and `tests/`. Uses Jest 29 — do **not** upgr
 
 ```bash
 deno test supabase/functions/check-vote-majority/check-vote-majority.test.ts
+deno test supabase/functions/finalize-ping-vote/finalize-ping-vote.test.ts
 deno test supabase/functions/fetch-nearby-places/fetch-nearby-places.test.ts
 deno test supabase/functions/notify-ping-cancelled/notify-ping-cancelled.test.ts
 deno test supabase/functions/notify-rsvp-change/notify-rsvp-change.test.ts
@@ -247,6 +266,8 @@ Requires a local Supabase stack:
 npx supabase start
 npx supabase test db
 ```
+
+Covers RLS policies plus the `start_ping_voting` RPC (timer deadline stamping, idempotency once voting has started, and that only the creator/an admin can start voting on a ping).
 
 ---
 

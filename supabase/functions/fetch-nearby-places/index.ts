@@ -3,8 +3,9 @@
  *
  * 1. Reads "in" RSVPs with location for the ping.
  * 2. Computes the barycenter of member locations.
- * 3. Queries Overpass API (OpenStreetMap) for bars/restaurants within 800 m.
- * 4. Merges participants' saved_places within 800 m.
+ * 3. Queries Overpass API (OpenStreetMap) for restaurants/bars within
+ *    SEARCH_RADIUS_M.
+ * 4. Merges participants' saved_places within SEARCH_RADIUS_M.
  * 5. Inserts results into the places table.
  *
  * The client subscribes to the places Realtime channel and renders cards as
@@ -12,7 +13,7 @@
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
 
-const SEARCH_RADIUS_M = 800;
+const SEARCH_RADIUS_M = 400;
 const MAX_PLACES = 8;
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',

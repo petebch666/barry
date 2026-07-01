@@ -59,7 +59,17 @@ function AuthGate() {
 
   // ── Auth state ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      // getSession() only reads the locally persisted session. For a
+      // signed-in user, also validate it against the Auth server via
+      // getUser() before flipping `initialized` — this guarantees the
+      // client's session is fully attached to outgoing requests, avoiding a
+      // race where RLS-scoped queries fire too early and silently return
+      // zero rows.
+      if (s) await supabase.auth.getUser();
+      if (cancelled) return;
       setSession(s);
       setInitialized(true);
     });
@@ -68,7 +78,10 @@ function AuthGate() {
       setSession(s);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // ── Route guard ─────────────────────────────────────────────────────────────

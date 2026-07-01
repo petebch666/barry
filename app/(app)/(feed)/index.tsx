@@ -32,6 +32,7 @@ export default function FeedScreen() {
           <TouchableOpacity
             style={[styles.orb, !hasGroups && initialized && styles.orbDim]}
             onPress={hasGroups ? () => router.push('/create-ping') : () => router.push('/create-group')}
+            disabled={!initialized}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={hasGroups ? 'Send a ping' : 'Create your first group'}

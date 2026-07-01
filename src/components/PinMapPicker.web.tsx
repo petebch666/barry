@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { MapErrorBoundary } from './MapErrorBoundary';
 
@@ -43,6 +43,16 @@ export default function PinMapPicker({ initialLocation, onLocationChange }: Prop
   const onChangeRef = useRef(onLocationChange);
   onChangeRef.current = onLocationChange;
 
+  // Lazy initializer: srcDoc is built once from the location we're mounted
+  // with, not recomputed on every render. Setting srcDoc on an already-
+  // mounted iframe forces a full reload — if it tracked initialLocation
+  // directly, dragging the marker (which reports back via postMessage and
+  // updates the parent's state, which flows back down as a new
+  // initialLocation prop) would reload the map and wipe out the very drag
+  // the user just made. The marker's own drag handler already keeps the map
+  // in sync without needing React to re-render the iframe.
+  const [html] = useState(() => buildHtml(initialLocation.latitude, initialLocation.longitude));
+
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       try {
@@ -60,7 +70,7 @@ export default function PinMapPicker({ initialLocation, onLocationChange }: Prop
     <MapErrorBoundary>
       <View style={styles.container}>
         {React.createElement('iframe', {
-          srcDoc: buildHtml(initialLocation.latitude, initialLocation.longitude),
+          srcDoc: html,
           style: { width: '100%', height: '100%', border: 'none' },
           title: 'Map',
         })}

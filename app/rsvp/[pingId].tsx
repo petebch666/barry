@@ -60,6 +60,16 @@ export default function RsvpModal() {
         }
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setPendingLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      } catch {
+        // Browser/OS-level failures (e.g. web geolocation blocked on an
+        // insecure origin) surface here rather than leaving the modal in an
+        // inconsistent state.
+        Alert.alert(
+          "Couldn't get your location",
+          "Try 'Set on map' instead.",
+        );
+        setShowMapModal(false);
+        setLocationMode('none');
       } finally {
         setLocating(false);
       }
@@ -77,6 +87,19 @@ export default function RsvpModal() {
   function cancelMapModal() {
     setShowMapModal(false);
     setLocationMode('none');
+  }
+
+  // System-triggered dismissal (e.g. Modal's onRequestClose, which
+  // react-native-web can fire from browser events beyond an explicit user
+  // tap — such as focus loss when the browser's geolocation permission UI
+  // appears). Unlike the explicit Cancel button, this must not reset
+  // locationMode: doing so can silently discard a location fetch that was
+  // still in flight or had just succeeded. Ignored entirely while a fetch
+  // is in progress, since that shouldn't be interruptible by an incidental
+  // event.
+  function dismissMapModal() {
+    if (locating) return;
+    setShowMapModal(false);
   }
 
   async function submit() {
@@ -179,7 +202,7 @@ export default function RsvpModal() {
         visible={showMapModal}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={cancelMapModal}
+        onRequestClose={dismissMapModal}
       >
         <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
