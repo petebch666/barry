@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { SavedPlaceSchema, type Profile, type SavedPlace } from '@/schemas';
+import { ProfileSchema, SavedPlaceSchema, type Profile, type SavedPlace } from '@/schemas';
 import { z } from 'zod';
+
+const UpdateProfileSchema = ProfileSchema.pick({ display_name: true })
+  .partial()
+  .extend({ avatar_url: z.string().url().nullable().optional() });
 
 const SavePlaceInputSchema = SavedPlaceSchema.pick({
   name: true, address: true, latitude: true, longitude: true, category: true,
@@ -35,6 +39,7 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async (updates: Partial<Pick<Profile, 'display_name' | 'avatar_url'>>) => {
+      UpdateProfileSchema.parse(updates);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
