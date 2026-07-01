@@ -137,6 +137,14 @@ export const SavedPlaceSchema = z.object({
   created_at: z.string().datetime(),
 });
 
+export const AddSavedPlaceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  address: z.string().max(500).optional(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  category: z.string().max(100).optional(),
+});
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const EmailAuthSchema = z.object({
@@ -161,4 +169,5 @@ export type SuggestPlace = z.infer<typeof SuggestPlaceSchema>;
 export type Vote = z.infer<typeof VoteSchema>;
 export type CastVote = z.infer<typeof CastVoteSchema>;
 export type SavedPlace = z.infer<typeof SavedPlaceSchema>;
+export type AddSavedPlace = z.infer<typeof AddSavedPlaceSchema>;
 export type EmailAuth = z.infer<typeof EmailAuthSchema>;

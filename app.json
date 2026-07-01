@@ -42,12 +42,6 @@
           "color": "#3B82F6"
         }
       ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": ""
-        }
-      ],
       "expo-web-browser"
     ],
     "experiments": {

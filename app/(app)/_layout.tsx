@@ -26,7 +26,7 @@ function GlassTabBar({ state, navigation }: BottomTabBarProps) {
         <BlurView tint="dark" intensity={65} style={styles.absoluteFillNoEvents} pointerEvents="none" />
         <View style={styles.tabBarOverlay} />
         {TABS.map((tab) => {
-          const routeIndex = state.routes.findIndex((r) => r.name === tab.name);
+          const routeIndex = state.routes.findIndex((r: { name: string }) => r.name === tab.name);
           const isFocused = state.index === routeIndex;
           const isProfileRelated =
             tab.name === '(profile)' && activeName === '(groups)';

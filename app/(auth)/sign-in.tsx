@@ -20,7 +20,7 @@ import { colors, radii } from '@/lib/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type LoadingState = 'google' | 'apple' | 'email' | null;
+type LoadingState = 'apple' | 'email' | null;
 type Mode = 'signin' | 'signup';
 
 export default function SignInScreen() {
@@ -34,7 +34,7 @@ export default function SignInScreen() {
     if (error) setError(null);
   }
 
-  async function signInWith(provider: 'google' | 'apple') {
+  async function signInWith(provider: 'apple') {
     setLoading(provider);
     setError(null);
     try {
@@ -176,13 +176,6 @@ export default function SignInScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <OAuthButton
-            label="Continue with Google"
-            prefix="G"
-            onPress={() => signInWith('google')}
-            loading={loading === 'google'}
-            disabled={loading !== null}
-          />
           <OAuthButton
             label="Continue with Apple"
             prefix=""

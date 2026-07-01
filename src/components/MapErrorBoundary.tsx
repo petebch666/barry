@@ -17,7 +17,7 @@ export class MapErrorBoundary extends React.Component<React.PropsWithChildren<ob
         <View style={styles.fallback}>
           <Text style={styles.icon}>🗺️</Text>
           <Text style={styles.text}>Map unavailable</Text>
-          <Text style={styles.hint}>A Google Maps API key is required on Android.</Text>
+          <Text style={styles.hint}>Map failed to load.</Text>
         </View>
       );
     }
