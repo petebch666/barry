@@ -46,6 +46,8 @@ export const PingSchema = z.object({
   status: PingStatusSchema,
   confirmed_place_id: z.string().uuid().nullable(),
   expires_at: z.string().datetime(),
+  vote_timer_minutes: z.number().int().positive().nullable(),
+  voting_deadline: z.string().datetime().nullable(),
   created_at: z.string().datetime(),
 });
 
@@ -53,6 +55,7 @@ export const CreatePingSchema = z.object({
   group_id: z.string().uuid(),
   message: z.string().min(1, 'Message is required').max(500),
   proposed_time: z.string().datetime().nullable().optional(),
+  vote_timer_minutes: z.number().int().positive().nullable().optional(),
 });
 
 // ─── RSVPs ───────────────────────────────────────────────────────────────────

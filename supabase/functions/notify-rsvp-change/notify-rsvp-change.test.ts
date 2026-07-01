@@ -2,7 +2,7 @@
  * Unit tests for notify-rsvp-change business logic.
  * Run with: deno test supabase/functions/notify-rsvp-change/notify-rsvp-change.test.ts
  */
-import { assertEquals, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assertEquals, assertExists, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 // ─── Extracted pure functions (mirrored from index.ts for unit testing) ────────
 
@@ -128,4 +128,24 @@ Deno.test('integration — 2km barycenter shift from leaver notifies remaining m
 
   const shift = haversineMeters(oldCenter, newCenter);
   assertEquals(shift >= SHIFT_THRESHOLD_M, true, `Expected shift ≥ 1000 m, got ${Math.round(shift)} m`);
+});
+
+// ─── Tests — Overpass query builder (mirrored from index.ts) ─────────────────
+
+function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
+  return [
+    '[out:json][timeout:10];',
+    '(',
+    `  node["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
+    `  way["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
+    ');',
+    'out body center;',
+  ].join('\n');
+}
+
+Deno.test('overpass query — narrowed to restaurant/bar only, consistent with fetch-nearby-places', () => {
+  const q = buildOverpassQuery(48.86, 2.35, 800);
+  assertStringIncludes(q, '^(restaurant|bar)$');
+  assertEquals(q.includes('cafe'), false);
+  assertEquals(q.includes('pub'), false);
 });

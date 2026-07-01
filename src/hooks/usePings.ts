@@ -146,10 +146,9 @@ export function useStartVoting() {
 
   return useMutation({
     mutationFn: async (pingId: string) => {
-      const { error } = await supabase
-        .from('pings')
-        .update({ status: 'voting' })
-        .eq('id', pingId);
+      // Deadline (if any) is computed server-side by start_ping_voting from
+      // vote_timer_minutes, avoiding client clock-skew.
+      const { error } = await supabase.rpc('start_ping_voting', { p_ping_id: pingId });
 
       if (error) throw error;
     },

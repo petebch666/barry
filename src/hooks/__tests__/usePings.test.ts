@@ -47,4 +47,49 @@ describe('CreatePingSchema', () => {
       proposed_time: 'tonight',
     })).toThrow();
   });
+
+  test('accepts valid vote_timer_minutes', () => {
+    expect(() => CreatePingSchema.parse({
+      group_id: validGroupId,
+      message: 'Drinks?',
+      vote_timer_minutes: 30,
+    })).not.toThrow();
+  });
+
+  test('accepts null vote_timer_minutes (no timer)', () => {
+    expect(() => CreatePingSchema.parse({
+      group_id: validGroupId,
+      message: 'Drinks?',
+      vote_timer_minutes: null,
+    })).not.toThrow();
+  });
+
+  test('accepts omitted vote_timer_minutes', () => {
+    expect(() => CreatePingSchema.parse({ group_id: validGroupId, message: 'Drinks?' }))
+      .not.toThrow();
+  });
+
+  test('rejects zero vote_timer_minutes', () => {
+    expect(() => CreatePingSchema.parse({
+      group_id: validGroupId,
+      message: 'Drinks?',
+      vote_timer_minutes: 0,
+    })).toThrow();
+  });
+
+  test('rejects negative vote_timer_minutes', () => {
+    expect(() => CreatePingSchema.parse({
+      group_id: validGroupId,
+      message: 'Drinks?',
+      vote_timer_minutes: -15,
+    })).toThrow();
+  });
+
+  test('rejects non-integer vote_timer_minutes', () => {
+    expect(() => CreatePingSchema.parse({
+      group_id: validGroupId,
+      message: 'Drinks?',
+      vote_timer_minutes: 15.5,
+    })).toThrow();
+  });
 });

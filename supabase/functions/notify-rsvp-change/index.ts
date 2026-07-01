@@ -139,8 +139,8 @@ Deno.serve(async (req) => {
         const query = [
           '[out:json][timeout:10];',
           '(',
-          `  node["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
-          `  way["amenity"~"^(bar|pub|restaurant|cafe)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
+          `  node["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
+          `  way["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
           ');',
           'out body center;',
         ].join('\n');

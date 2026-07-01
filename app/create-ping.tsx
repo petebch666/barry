@@ -10,14 +10,24 @@ import { useGroups } from '@/hooks/useGroups';
 import { colors, radii } from '@/lib/theme';
 import type { Group } from '@/schemas';
 
+const VOTE_TIMER_OPTIONS: { label: string; value: number | null }[] = [
+  { label: 'No timer', value: null },
+  { label: '15m', value: 15 },
+  { label: '30m', value: 30 },
+  { label: '1h', value: 60 },
+  { label: '2h', value: 120 },
+];
+
 export default function CreatePingModal() {
   const router = useRouter();
   const { data: groups, isLoading: groupsLoading } = useGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [voteTimerMinutes, setVoteTimerMinutes] = useState<number | null>(null);
   const { mutateAsync: createPing, isPending } = useCreatePing();
 
   const selectedGroup = groups?.find((g) => g.id === selectedGroupId);
+  const selectedTimerLabel = VOTE_TIMER_OPTIONS.find((o) => o.value === voteTimerMinutes)?.label;
 
   async function submit() {
     if (!selectedGroupId) {
@@ -30,7 +40,11 @@ export default function CreatePingModal() {
       return;
     }
     try {
-      const ping = await createPing({ group_id: selectedGroupId, message: trimmed });
+      const ping = await createPing({
+        group_id: selectedGroupId,
+        message: trimmed,
+        vote_timer_minutes: voteTimerMinutes,
+      });
       router.replace(`/(app)/(feed)/ping/${ping.id}`);
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not send ping.');
@@ -120,12 +134,41 @@ export default function CreatePingModal() {
           />
           <Text style={styles.hint}>{message.length}/500</Text>
 
+          <Text style={styles.label}>Vote timer (optional)</Text>
+          <View style={styles.groupList}>
+            {VOTE_TIMER_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.label}
+                style={[
+                  styles.groupChip,
+                  voteTimerMinutes === option.value && styles.groupChipSelected,
+                ]}
+                onPress={() => setVoteTimerMinutes(option.value)}
+                accessibilityRole="button"
+                accessibilityLabel={`Vote timer: ${option.label}`}
+                accessibilityState={{ selected: voteTimerMinutes === option.value }}
+              >
+                <Text style={[
+                  styles.groupChipText,
+                  voteTimerMinutes === option.value && styles.groupChipTextSelected,
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           {selectedGroup && (
             <View style={styles.summary}>
               <Text style={styles.summaryText}>
                 Your ping will be sent to all members of{' '}
                 <Text style={styles.summaryBold}>{selectedGroup.name}</Text>.
                 It expires in 8 hours if no meetup is confirmed.
+                {voteTimerMinutes != null && (
+                  <>
+                    {' '}Voting auto-finalizes after {selectedTimerLabel}, or sooner if everyone votes.
+                  </>
+                )}
               </Text>
             </View>
           )}

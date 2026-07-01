@@ -134,8 +134,8 @@ function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
   return [
     '[out:json][timeout:25];',
     '(',
-    `  node["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${radiusM},${lat},${lng});`,
-    `  way["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${radiusM},${lat},${lng});`,
+    `  node["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
+    `  way["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
     ');',
     'out body center;',
   ].join('\n');
@@ -144,11 +144,19 @@ function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
 Deno.test('overpass query — contains expected amenity filter', () => {
   const q = buildOverpassQuery(48.86, 2.35, 800);
   assertStringIncludes(q, 'amenity');
-  assertStringIncludes(q, 'bar|pub|restaurant|cafe|biergarten|fast_food');
+  assertStringIncludes(q, '^(restaurant|bar)$');
   assertStringIncludes(q, 'around:800');
   assertStringIncludes(q, '48.86');
   assertStringIncludes(q, '2.35');
   assertStringIncludes(q, 'out body center');
+});
+
+Deno.test('overpass query — excludes cafe/pub/biergarten/fast_food (spec: restaurant/bar only)', () => {
+  const q = buildOverpassQuery(48.86, 2.35, 800);
+  assertEquals(q.includes('cafe'), false);
+  assertEquals(q.includes('pub'), false);
+  assertEquals(q.includes('biergarten'), false);
+  assertEquals(q.includes('fast_food'), false);
 });
 
 Deno.test('overpass query — timeout directive present', () => {

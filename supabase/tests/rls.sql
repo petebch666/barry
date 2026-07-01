@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(14);
+SELECT plan(19);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -184,6 +184,72 @@ SELECT results_eq(
   $$ SELECT count(*)::int FROM groups WHERE invite_code = 'TEST1234' $$,
   ARRAY[1],
   'charlie can now read the group after joining'
+);
+
+-- ─── Test: start_ping_voting RPC (vote timer feature) ─────────
+-- Two more 'open' pings for these tests, since pid above still needs to
+-- stay untouched for the tests above to have run against it.
+INSERT INTO pings (id, group_id, created_by, message, vote_timer_minutes)
+SELECT gen_random_uuid(), g.id, tests.get_supabase_uid('alice'), 'No-timer ping', NULL
+FROM groups g WHERE g.invite_code = 'TEST1234';
+
+INSERT INTO pings (id, group_id, created_by, message, vote_timer_minutes)
+SELECT gen_random_uuid(), g.id, tests.get_supabase_uid('alice'), 'Timed ping', 30
+FROM groups g WHERE g.invite_code = 'TEST1234';
+
+INSERT INTO pings (id, group_id, created_by, message, vote_timer_minutes)
+SELECT gen_random_uuid(), g.id, tests.get_supabase_uid('alice'), 'RLS-guarded ping', NULL
+FROM groups g WHERE g.invite_code = 'TEST1234';
+
+SELECT tests.authenticate_as('alice');
+
+-- No timer: voting_deadline stays null after starting voting.
+SELECT results_eq(
+  $$ SELECT status, voting_deadline IS NULL
+     FROM start_ping_voting(
+       (SELECT id FROM pings WHERE message = 'No-timer ping')
+     ) $$,
+  $$ VALUES ('voting'::text, true) $$,
+  'start_ping_voting with no timer leaves voting_deadline null'
+);
+
+-- Timer set: voting_deadline is stamped ~30 minutes out.
+SELECT results_eq(
+  $$ SELECT status, voting_deadline BETWEEN NOW() + INTERVAL '29 minutes' AND NOW() + INTERVAL '31 minutes'
+     FROM start_ping_voting(
+       (SELECT id FROM pings WHERE message = 'Timed ping')
+     ) $$,
+  $$ VALUES ('voting'::text, true) $$,
+  'start_ping_voting with a 30-minute timer stamps voting_deadline ~30 minutes out'
+);
+
+-- Idempotency: calling it again on an already-'voting' ping is a no-op.
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM start_ping_voting(
+       (SELECT id FROM pings WHERE message = 'No-timer ping')
+     ) $$,
+  ARRAY[0],
+  'start_ping_voting is a no-op once the ping is no longer open'
+);
+
+-- Bob is a group member but neither the creator nor an admin of this ping —
+-- the "creator or admin can update" policy's USING clause silently filters
+-- the UPDATE inside the function to zero rows (no error, just no effect).
+SELECT tests.authenticate_as('bob');
+
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM start_ping_voting(
+       (SELECT id FROM pings WHERE message = 'RLS-guarded ping')
+     ) $$,
+  ARRAY[0],
+  'non-creator, non-admin member cannot start voting on someone else''s ping'
+);
+
+SELECT tests.authenticate_as('alice');
+SELECT results_eq(
+  $$ SELECT status FROM pings WHERE message = 'RLS-guarded ping' $$,
+  ARRAY['open'],
+  'RLS-guarded ping is still open after bob''s blocked attempt'
 );
 
 SELECT * FROM finish();

@@ -124,6 +124,8 @@ export type Database = {
           message: string
           proposed_time: string | null
           status: string
+          vote_timer_minutes: number | null
+          voting_deadline: string | null
         }
         Insert: {
           confirmed_place_id?: string | null
@@ -135,6 +137,8 @@ export type Database = {
           message: string
           proposed_time?: string | null
           status?: string
+          vote_timer_minutes?: number | null
+          voting_deadline?: string | null
         }
         Update: {
           confirmed_place_id?: string | null
@@ -146,6 +150,8 @@ export type Database = {
           message?: string
           proposed_time?: string | null
           status?: string
+          vote_timer_minutes?: number | null
+          voting_deadline?: string | null
         }
         Relationships: [
           {
@@ -445,6 +451,28 @@ export type Database = {
         }[]
       }
       nullify_terminal_ping_locations: { Args: never; Returns: undefined }
+      start_ping_voting: {
+        Args: { p_ping_id: string }
+        Returns: {
+          confirmed_place_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          group_id: string
+          id: string
+          message: string
+          proposed_time: string | null
+          status: string
+          vote_timer_minutes: number | null
+          voting_deadline: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never

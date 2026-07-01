@@ -109,3 +109,4 @@ Tests live in:
 - **Apple Sign In only works on a physical device** — cannot be tested in simulator.
 - **Windows + iOS** — no local Xcode. All iOS builds go through EAS. Register device UDID in Apple Developer portal before requesting a dev build.
 - **pg_cron availability** — the triggers migration registers cron jobs conditionally (`IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')`). Enable pg_cron in the Supabase Dashboard under Database → Extensions before running migrations in production.
+- **pg_net + Vault for cron-triggered Edge Functions** — `011_finalize_vote_cron.sql` calls `finalize-ping-vote` on a schedule via `net.http_post`. This needs the `pg_net` extension enabled (Database → Extensions) and the project URL + service-role key stored as Vault secrets (`project_url`, `service_role_key`) via the SQL editor — migrations can't create these secrets themselves.

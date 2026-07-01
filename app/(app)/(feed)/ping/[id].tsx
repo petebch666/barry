@@ -17,6 +17,14 @@ import PingMap from '@/components/PingMap';
 import { MapErrorBoundary } from '@/components/MapErrorBoundary';
 import type { Place } from '@/schemas';
 
+function formatCountdown(deadline: string): string {
+  const msLeft = new Date(deadline).getTime() - Date.now();
+  if (msLeft <= 0) return 'finalizing…';
+  const minutes = Math.ceil(msLeft / 60_000);
+  if (minutes < 60) return `${minutes}m left`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m left`;
+}
+
 export default function PingDetailScreen() {
   const { id: pingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -51,6 +59,14 @@ export default function PingDetailScreen() {
     const t = setTimeout(() => setPlacesTimedOut(true), 30_000);
     return () => clearTimeout(t);
   }, [ping?.status, places.length]);
+
+  // Re-render every 30s while a vote timer is running so the countdown stays fresh.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (ping?.status !== 'voting' || !ping.voting_deadline) return;
+    const t = setInterval(() => forceTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, [ping?.status, ping?.voting_deadline]);
 
   const { mutateAsync: startVoting, isPending: isStartingVoting } = useStartVoting();
   const { mutateAsync: cancelPing, isPending: isCancelling } = useCancelPing();
@@ -194,9 +210,14 @@ export default function PingDetailScreen() {
           {/* Places + voting */}
           {(ping.status === 'voting' || isConfirmed) && places.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {isConfirmed ? 'Confirmed venue' : 'Vote for a place'}
-              </Text>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitle}>
+                  {isConfirmed ? 'Confirmed venue' : 'Vote for a place'}
+                </Text>
+                {!isConfirmed && ping.voting_deadline && (
+                  <Text style={styles.countdown}>{formatCountdown(ping.voting_deadline)}</Text>
+                )}
+              </View>
               {places.map((place) => (
                 <PlaceCard
                   key={place.id}
@@ -442,7 +463,9 @@ const styles = StyleSheet.create({
   backText: { fontSize: 17, color: colors.accent, fontWeight: '500' },
   scroll: { padding: 16, gap: 12, paddingBottom: BOTTOM_TAB_PADDING },
   section: { padding: 16, gap: 10 },
+  sectionTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  countdown: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
   message: { fontSize: 20, fontWeight: '700', color: colors.text, lineHeight: 26 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rsvpCount: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
