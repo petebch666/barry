@@ -202,6 +202,14 @@ export default function ProfileScreen() {
           {/* ── Saved Places section ── */}
           <View style={[styles.sectionHeader, { marginTop: 8 }]}>
             <Text style={styles.sectionTitle}>Saved Places</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/add-saved-place')}
+              style={[styles.sectionBtn, styles.sectionBtnPrimary]}
+              accessibilityRole="button"
+              accessibilityLabel="Add a saved place"
+            >
+              <Text style={[styles.sectionBtnText, styles.sectionBtnTextPrimary]}>+ Add</Text>
+            </TouchableOpacity>
           </View>
 
           {placesLoading ? (
@@ -210,7 +218,7 @@ export default function ProfileScreen() {
             <GlassCard style={styles.emptyCard}>
               <Text style={styles.emptyText}>No saved places</Text>
               <Text style={styles.emptyHint}>
-                Tap ♡ on a venue during voting to save it.
+                Tap + Add to save a place, or ♡ a venue during voting.
               </Text>
             </GlassCard>
           ) : (
