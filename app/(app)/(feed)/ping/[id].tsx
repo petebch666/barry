@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +32,16 @@ export default function PingDetailScreen() {
   useRsvpsRealtime(pingId);
   usePlacesRealtime(pingId);
   useVotesRealtime(pingId);
+
+  // If the edge function finds nothing (or no one shared a location), the
+  // realtime channel never fires. Detect both cases so the spinner doesn't run forever.
+  const hasLocationData = inRsvpsWithLocation.length > 0;
+  const [placesTimedOut, setPlacesTimedOut] = useState(false);
+  useEffect(() => {
+    if (ping?.status !== 'voting' || places.length > 0) { setPlacesTimedOut(false); return; }
+    const t = setTimeout(() => setPlacesTimedOut(true), 30_000);
+    return () => clearTimeout(t);
+  }, [ping?.status, places.length]);
 
   const { mutateAsync: startVoting, isPending: isStartingVoting } = useStartVoting();
   const { mutateAsync: cancelPing, isPending: isCancelling } = useCancelPing();
@@ -229,10 +239,46 @@ export default function PingDetailScreen() {
           )}
 
           {ping.status === 'voting' && places.length === 0 && (
-            <View style={styles.loadingPlaces}>
-              <ActivityIndicator color={colors.accent} />
-              <Text style={styles.loadingPlacesText}>Finding places near your meeting point…</Text>
-            </View>
+            !hasLocationData ? (
+              // Nobody shared a location — edge function will skip, no point waiting
+              <View style={styles.loadingPlaces}>
+                <Text style={styles.loadingPlacesText}>
+                  No one has shared their location yet, so we can't suggest nearby places automatically.
+                </Text>
+                {myRsvp?.status === 'in' && (
+                  <TouchableOpacity
+                    style={[styles.suggestBtn, { marginTop: 8 }]}
+                    onPress={() => router.push(`/suggest-place/${pingId}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Suggest a place"
+                  >
+                    <Text style={styles.suggestBtnText}>+ Suggest a place</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : placesTimedOut ? (
+              // Edge function ran but found nothing
+              <View style={styles.loadingPlaces}>
+                <Text style={styles.loadingPlacesText}>
+                  No venues found nearby. Try suggesting one manually.
+                </Text>
+                {myRsvp?.status === 'in' && (
+                  <TouchableOpacity
+                    style={[styles.suggestBtn, { marginTop: 8 }]}
+                    onPress={() => router.push(`/suggest-place/${pingId}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Suggest a place"
+                  >
+                    <Text style={styles.suggestBtnText}>+ Suggest a place</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.loadingPlaces}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.loadingPlacesText}>Finding places near your meeting point…</Text>
+              </View>
+            )
           )}
 
           {/* Cancel ping — creator only, while still active */}

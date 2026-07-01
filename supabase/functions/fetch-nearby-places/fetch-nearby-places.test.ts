@@ -2,7 +2,7 @@
  * Unit tests for fetch-nearby-places business logic.
  * Run with: deno test supabase/functions/fetch-nearby-places/fetch-nearby-places.test.ts
  */
-import { assertEquals, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assertEquals, assertExists, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 // ─── Extracted pure functions ─────────────────────────────────────────────────
 
@@ -126,4 +126,129 @@ Deno.test('haversine — points <10 m apart give near-zero distance', () => {
   const b = { latitude: 48.8601, longitude: 2.3501 };
   const dist = haversineMeters(a, b);
   assertEquals(dist < 20, true);
+});
+
+// ─── Overpass query builder ───────────────────────────────────────────────────
+
+function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
+  return [
+    '[out:json][timeout:25];',
+    '(',
+    `  node["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${radiusM},${lat},${lng});`,
+    `  way["amenity"~"bar|pub|restaurant|cafe|biergarten|fast_food"](around:${radiusM},${lat},${lng});`,
+    ');',
+    'out body center;',
+  ].join('\n');
+}
+
+Deno.test('overpass query — contains expected amenity filter', () => {
+  const q = buildOverpassQuery(48.86, 2.35, 800);
+  assertStringIncludes(q, 'amenity');
+  assertStringIncludes(q, 'bar|pub|restaurant|cafe|biergarten|fast_food');
+  assertStringIncludes(q, 'around:800');
+  assertStringIncludes(q, '48.86');
+  assertStringIncludes(q, '2.35');
+  assertStringIncludes(q, 'out body center');
+});
+
+Deno.test('overpass query — timeout directive present', () => {
+  const q = buildOverpassQuery(48.86, 2.35, 800);
+  assertStringIncludes(q, '[timeout:25]');
+});
+
+// ─── OSM element parsing ──────────────────────────────────────────────────────
+
+interface OsmElement {
+  type: 'node' | 'way';
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+}
+
+function parseOsmElement(el: OsmElement): { lat: number; lon: number; name: string; address: string | null; category: string | null } | null {
+  const lat = el.type === 'node' ? el.lat : el.center?.lat;
+  const lon = el.type === 'node' ? el.lon : el.center?.lon;
+  const tags = el.tags ?? {};
+  if (!lat || !lon || !tags.name) return null;
+
+  const addrParts: string[] = [];
+  if (tags['addr:housenumber'] && tags['addr:street']) {
+    addrParts.push(`${tags['addr:housenumber']} ${tags['addr:street']}`);
+  } else if (tags['addr:street']) {
+    addrParts.push(tags['addr:street']);
+  }
+  if (tags['addr:city']) addrParts.push(tags['addr:city']);
+
+  return {
+    lat,
+    lon,
+    name: tags.name,
+    address: addrParts.join(', ') || null,
+    category: tags.amenity ?? null,
+  };
+}
+
+Deno.test('parseOsmElement — node with name returns parsed place', () => {
+  const el: OsmElement = {
+    type: 'node', id: 1, lat: 48.86, lon: 2.35,
+    tags: { name: 'Le Bar', amenity: 'bar', 'addr:street': 'Rue de Rivoli', 'addr:city': 'Paris' },
+  };
+  const result = parseOsmElement(el);
+  assertExists(result);
+  assertEquals(result.name, 'Le Bar');
+  assertEquals(result.category, 'bar');
+  assertEquals(result.address, 'Rue de Rivoli, Paris');
+  assertEquals(result.lat, 48.86);
+});
+
+Deno.test('parseOsmElement — node without name is filtered out', () => {
+  const el: OsmElement = { type: 'node', id: 2, lat: 48.86, lon: 2.35, tags: { amenity: 'bar' } };
+  assertEquals(parseOsmElement(el), null);
+});
+
+Deno.test('parseOsmElement — way uses center coords', () => {
+  const el: OsmElement = {
+    type: 'way', id: 3, center: { lat: 48.87, lon: 2.36 },
+    tags: { name: 'La Brasserie', amenity: 'restaurant' },
+  };
+  const result = parseOsmElement(el);
+  assertExists(result);
+  assertEquals(result.lat, 48.87);
+  assertEquals(result.lon, 2.36);
+  assertEquals(result.name, 'La Brasserie');
+});
+
+Deno.test('parseOsmElement — way without center is filtered out', () => {
+  const el: OsmElement = {
+    type: 'way', id: 4,
+    tags: { name: 'No Center Bar', amenity: 'bar' },
+  };
+  assertEquals(parseOsmElement(el), null);
+});
+
+Deno.test('parseOsmElement — address with housenumber and street', () => {
+  const el: OsmElement = {
+    type: 'node', id: 5, lat: 48.86, lon: 2.35,
+    tags: { name: 'Café de Flore', amenity: 'cafe', 'addr:housenumber': '172', 'addr:street': 'Boulevard Saint-Germain', 'addr:city': 'Paris' },
+  };
+  const result = parseOsmElement(el);
+  assertExists(result);
+  assertEquals(result.address, '172 Boulevard Saint-Germain, Paris');
+});
+
+Deno.test('parseOsmElement — no address tags gives null address', () => {
+  const el: OsmElement = {
+    type: 'node', id: 6, lat: 48.86, lon: 2.35,
+    tags: { name: 'Mystery Bar', amenity: 'bar' },
+  };
+  const result = parseOsmElement(el);
+  assertExists(result);
+  assertEquals(result.address, null);
+});
+
+Deno.test('parseOsmElement — missing lat/lon on node returns null', () => {
+  const el: OsmElement = { type: 'node', id: 7, tags: { name: 'Ghost Bar', amenity: 'bar' } };
+  assertEquals(parseOsmElement(el), null);
 });
