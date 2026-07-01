@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,21 +12,20 @@ import type { RsvpStatus } from '@/schemas';
 import PinMapPicker from '@/components/PinMapPicker';
 
 const STATUS_OPTIONS: { value: RsvpStatus; label: string; emoji: string; color: string }[] = [
-  { value: 'in',    label: 'I\'m in!',       emoji: '✅', color: colors.success },
-  { value: 'maybe', label: 'Maybe',           emoji: '🤔', color: colors.warning },
-  { value: 'out',   label: 'Can\'t make it', emoji: '❌', color: colors.error },
+  { value: 'in',    label: "I'm in!",       emoji: '✅', color: colors.success },
+  { value: 'maybe', label: 'Maybe',          emoji: '🤔', color: colors.warning },
+  { value: 'out',   label: "Can't make it", emoji: '❌', color: colors.error },
 ];
 
 type LocationMode = 'gps' | 'pin' | 'none';
 
-const LOCATION_MODES: { value: LocationMode; label: string; description: string }[] = [
-  { value: 'gps',  label: '📍 Current location', description: 'Share where you are right now' },
-  { value: 'pin',  label: '📌 Set on map',         description: 'Drop a pin where you\'ll be' },
-  { value: 'none', label: '🚫 No location',       description: 'Skip — meeting point won\'t update' },
+const LOCATION_MODES: { value: LocationMode; label: string }[] = [
+  { value: 'gps',  label: '📍 Current location' },
+  { value: 'pin',  label: '📌 Set on map' },
+  { value: 'none', label: '🚫 No location' },
 ];
 
-// Default map centre — used as starting pin position on first open
-const DEFAULT_REGION = { latitude: 48.8566, longitude: 2.3522 }; // Paris
+const DEFAULT_REGION = { latitude: 48.8566, longitude: 2.3522 };
 
 export default function RsvpModal() {
   const { pingId } = useLocalSearchParams<{ pingId: string }>();
@@ -36,36 +35,55 @@ export default function RsvpModal() {
 
   const [selected, setSelected] = useState<RsvpStatus>('in');
   const [locationMode, setLocationMode] = useState<LocationMode>('none');
-  const [pinnedLocation, setPinnedLocation] = useState<{ latitude: number; longitude: number }>(DEFAULT_REGION);
+  const [pinnedLocation, setPinnedLocation] = useState(DEFAULT_REGION);
+  const [pendingLocation, setPendingLocation] = useState(DEFAULT_REGION);
+  const [showMapModal, setShowMapModal] = useState(false);
   const [locating, setLocating] = useState(false);
+
+  async function handleLocationTap(mode: LocationMode) {
+    setLocationMode(mode);
+    if (mode === 'none') return;
+
+    if (mode === 'gps') {
+      setShowMapModal(true);
+      setLocating(true);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Location permission denied',
+            'Barry needs location access. You can still RSVP without sharing your location.',
+          );
+          setShowMapModal(false);
+          setLocationMode('none');
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setPendingLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      } finally {
+        setLocating(false);
+      }
+    } else {
+      setPendingLocation(pinnedLocation);
+      setShowMapModal(true);
+    }
+  }
+
+  function confirmMapLocation() {
+    setPinnedLocation(pendingLocation);
+    setShowMapModal(false);
+  }
+
+  function cancelMapModal() {
+    setShowMapModal(false);
+    setLocationMode('none');
+  }
 
   async function submit() {
     let location: { latitude: number; longitude: number } | null = null;
-
-    if (selected === 'in') {
-      if (locationMode === 'gps') {
-        setLocating(true);
-        try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert(
-              'Location permission denied',
-              'Barry needs location access. You can still RSVP without sharing your location.',
-            );
-          } else {
-            const pos = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
-            location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-          }
-        } finally {
-          setLocating(false);
-        }
-      } else if (locationMode === 'pin') {
-        location = pinnedLocation;
-      }
+    if (selected === 'in' && (locationMode === 'gps' || locationMode === 'pin')) {
+      location = pinnedLocation;
     }
-
     try {
       await upsertRsvp({ ping_id: pingId, status: selected, location: location ?? undefined });
       router.back();
@@ -73,8 +91,6 @@ export default function RsvpModal() {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not save your RSVP.');
     }
   }
-
-  const showMapPicker = selected === 'in' && locationMode === 'pin';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -93,7 +109,7 @@ export default function RsvpModal() {
           </View>
         )}
 
-        {/* Status options */}
+        {/* Status options — horizontal row */}
         <View style={styles.options}>
           {STATUS_OPTIONS.map((opt) => (
             <TouchableOpacity
@@ -115,63 +131,84 @@ export default function RsvpModal() {
           ))}
         </View>
 
-        {/* Location mode — only when 'in' */}
+        {/* Location mode — horizontal row, only when 'in' */}
         {selected === 'in' && (
           <View style={styles.locationSection}>
             <Text style={styles.locationSectionTitle}>Location</Text>
-            {LOCATION_MODES.map((mode) => (
-              <TouchableOpacity
-                key={mode.value}
-                style={[
-                  styles.locationOption,
-                  locationMode === mode.value && styles.locationOptionActive,
-                ]}
-                onPress={() => setLocationMode(mode.value)}
-                accessibilityRole="radio"
-                accessibilityLabel={mode.label}
-                accessibilityState={{ checked: locationMode === mode.value }}
-              >
-                <View style={styles.locationOptionText}>
+            <View style={styles.locationRow}>
+              {LOCATION_MODES.map((mode) => (
+                <TouchableOpacity
+                  key={mode.value}
+                  style={[
+                    styles.locationOption,
+                    locationMode === mode.value && styles.locationOptionActive,
+                  ]}
+                  onPress={() => handleLocationTap(mode.value)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={mode.label}
+                  accessibilityState={{ checked: locationMode === mode.value }}
+                >
                   <Text style={[styles.locationOptionLabel, locationMode === mode.value && styles.locationOptionLabelActive]}>
                     {mode.label}
                   </Text>
-                  <Text style={styles.locationOptionDesc}>{mode.description}</Text>
-                </View>
-                <View style={[styles.radioOuter, locationMode === mode.value && styles.radioOuterActive]}>
-                  {locationMode === mode.value && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Map pin picker — works on native and web */}
-        {showMapPicker && (
-          <View style={styles.mapPickerWrapper}>
-            <Text style={styles.mapPickerHint}>Drag the marker to where you'll be</Text>
-            <PinMapPicker
-              initialLocation={pinnedLocation}
-              onLocationChange={setPinnedLocation}
-            />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.submitButton, (isPending || locating) && styles.submitDisabled]}
+          style={[styles.submitButton, isPending && styles.submitDisabled]}
           onPress={submit}
-          disabled={isPending || locating}
+          disabled={isPending}
           accessibilityRole="button"
           accessibilityLabel="Confirm RSVP"
         >
-          {isPending || locating ? (
+          {isPending ? (
             <ActivityIndicator color={colors.text} />
           ) : (
             <Text style={styles.submitText}>Confirm</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Location map modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={cancelMapModal}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={cancelMapModal} accessibilityRole="button" accessibilityLabel="Cancel">
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {locationMode === 'gps' ? 'Your location' : 'Set location'}
+            </Text>
+            <TouchableOpacity onPress={confirmMapLocation} disabled={locating} accessibilityRole="button" accessibilityLabel="Confirm">
+              <Text style={[styles.modalConfirm, locating && { opacity: 0.4 }]}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+
+          {locating ? (
+            <View style={styles.modalLoading}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.modalLoadingText}>Finding your location…</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <PinMapPicker
+                initialLocation={pendingLocation}
+                onLocationChange={setPendingLocation}
+              />
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -199,57 +236,45 @@ const styles = StyleSheet.create({
   },
   pingMessage: { fontSize: 16, fontWeight: '600', color: colors.text },
 
-  // Status options
-  options: { gap: 10 },
+  // Status options — horizontal row of compact chips
+  options: { flexDirection: 'row', gap: 8 },
   option: {
-    flexDirection: 'row',
+    flex: 1,
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
-    padding: 16,
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
     backgroundColor: colors.surface,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  optionEmoji: { fontSize: 22 },
-  optionLabel: { fontSize: 16, fontWeight: '600', color: colors.text },
+  optionEmoji: { fontSize: 20 },
+  optionLabel: { fontSize: 13, fontWeight: '600', color: colors.text, textAlign: 'center' },
 
   // Location section
   locationSection: { gap: 8 },
-  locationSectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  locationSectionTitle: {
+    fontSize: 13, fontWeight: '600', color: colors.textSecondary,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  locationRow: { flexDirection: 'row', gap: 8 },
   locationOption: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    padding: 14,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
     backgroundColor: colors.surface,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12,
   },
-  locationOptionActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent + '14',
-  },
-  locationOptionText: { flex: 1, gap: 2 },
-  locationOptionLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
+  locationOptionActive: { borderColor: colors.accent, backgroundColor: colors.accent + '14' },
+  locationOptionLabel: { fontSize: 12, fontWeight: '600', color: colors.text, textAlign: 'center' },
   locationOptionLabelActive: { color: colors.accent },
-  locationOptionDesc: { fontSize: 12, color: colors.textTertiary },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterActive: { borderColor: colors.accent },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
-
-  // Map picker
-  mapPickerWrapper: { gap: 8 },
-  mapPickerHint: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
 
   // Footer
   footer: { padding: 20, paddingTop: 8 },
@@ -261,4 +286,21 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: colors.text, fontSize: 17, fontWeight: '600' },
+
+  // Map modal
+  modalContainer: { flex: 1, backgroundColor: colors.bg },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
+  modalCancel: { fontSize: 16, color: colors.textSecondary },
+  modalConfirm: { fontSize: 16, fontWeight: '600', color: colors.accent },
+  modalLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  modalLoadingText: { fontSize: 14, color: colors.textSecondary },
 });
