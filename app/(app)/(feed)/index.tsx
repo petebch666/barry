@@ -23,20 +23,33 @@ export default function FeedScreen() {
   const hasGroups = (groups?.length ?? 0) > 0;
   const initialized = !isLoading && !groupsLoading;
 
-  function handlePingPress() {
-    router.push('/create-ping');
-  }
-
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
 
-        {/* ── Top half: ping tiles ─────────────────────────────────── */}
-        <View style={styles.pingsSection}>
+        {/* ── Top half: ping orb ───────────────────────────────────── */}
+        <View style={styles.orbSection}>
+          <TouchableOpacity
+            style={[styles.orb, !hasGroups && initialized && styles.orbDim]}
+            onPress={hasGroups ? () => router.push('/create-ping') : () => router.push('/create-group')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={hasGroups ? 'Send a ping' : 'Create your first group'}
+          >
+            <Text style={styles.orbIcon}>◎</Text>
+            <Text style={styles.orbLabel}>{hasGroups ? 'Ping' : 'Create group'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Bottom half: ping list ───────────────────────────────── */}
+        <View style={styles.listSection}>
           <FlatList
             data={pings ?? []}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: BOTTOM_TAB_PADDING + 16 },
+            ]}
             refreshControl={
               <RefreshControl
                 refreshing={isRefetching}
@@ -52,43 +65,13 @@ export default function FeedScreen() {
                   <Text style={styles.emptyText}>No pings yet</Text>
                   <Text style={styles.emptyHint}>
                     {hasGroups
-                      ? 'Tap the button below to send the first ping.'
+                      ? 'Tap the button above to send the first ping.'
                       : 'Create a group and send your first ping.'}
                   </Text>
                 </View>
               ) : null
             }
           />
-        </View>
-
-        {/* ── Bottom half: ping orb ────────────────────────────────── */}
-        <View style={styles.orbSection}>
-          {initialized && !hasGroups && (
-            <Text style={styles.noGroupHint}>
-              You're not in any group yet.{' '}
-              <Text
-                style={styles.noGroupLink}
-                onPress={() => router.push('/create-group')}
-              >
-                Create one →
-              </Text>
-            </Text>
-          )}
-
-          <TouchableOpacity
-            style={[styles.orb, !hasGroups && initialized && styles.orbDim]}
-            onPress={hasGroups ? handlePingPress : () => router.push('/create-group')}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel={hasGroups ? 'Send a ping' : 'Create your first group'}
-          >
-            <Text style={styles.orbIcon}>◎</Text>
-            <Text style={styles.orbLabel}>{hasGroups ? 'Ping' : 'Create group'}</Text>
-          </TouchableOpacity>
-
-          {initialized && hasGroups && (
-            <Text style={styles.orbHint}>Tap to ping your crew</Text>
-          )}
         </View>
 
       </SafeAreaView>
@@ -136,25 +119,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   safeArea: { flex: 1 },
 
-  // ── Top section ──────────────────────────────────────────────────────────
-  pingsSection: {
-    flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  listContent: {
-    padding: 12,
-    gap: 10,
-    flexGrow: 1,
-  },
-
-  // ── Bottom section ───────────────────────────────────────────────────────
+  // ── Top half: orb ────────────────────────────────────────────────────────
   orbSection: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    paddingBottom: BOTTOM_TAB_PADDING,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   orb: {
     width: ORB_SIZE,
@@ -185,20 +156,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  orbHint: { fontSize: 14, color: colors.textTertiary },
 
-  // ── No-group callout ─────────────────────────────────────────────────────
-  noGroupHint: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 },
-  noGroupLink: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  // ── Bottom half: list ─────────────────────────────────────────────────────
+  listSection: { flex: 1 },
+  listContent: { padding: 12, gap: 10, flexGrow: 1 },
 
-  // ── Ping list ────────────────────────────────────────────────────────────
+  // ── Ping cards ────────────────────────────────────────────────────────────
   card: { padding: 16, gap: 8 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   groupName: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   message: { fontSize: 17, fontWeight: '600', color: colors.text, lineHeight: 22 },
   time: { fontSize: 13, color: colors.textTertiary },
 
-  // ── Empty state ──────────────────────────────────────────────────────────
+  // ── Empty state ───────────────────────────────────────────────────────────
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyText: { fontSize: 16, fontWeight: '600', color: colors.textTertiary, marginBottom: 6 },
   emptyHint: { fontSize: 14, color: colors.textTertiary, textAlign: 'center', lineHeight: 20 },
