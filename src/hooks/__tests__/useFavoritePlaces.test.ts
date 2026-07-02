@@ -18,6 +18,10 @@ describe('RatePlaceSchema', () => {
     expect(() => RatePlaceSchema.parse({ place_id: validPlaceId, rating: 'not_for_me' })).not.toThrow();
   });
 
+  test('accepts want_to_try', () => {
+    expect(() => RatePlaceSchema.parse({ place_id: validPlaceId, rating: 'want_to_try' })).not.toThrow();
+  });
+
   test('rejects an invalid rating value', () => {
     expect(() => RatePlaceSchema.parse({ place_id: validPlaceId, rating: 'five_stars' })).toThrow();
   });

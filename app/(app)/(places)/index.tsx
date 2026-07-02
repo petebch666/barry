@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl,
 } from 'react-native';
@@ -7,16 +8,28 @@ import { useFavoritePlaces, useRatePlace, type FavoritePlace } from '@/hooks/use
 import { useProfile } from '@/hooks/useProfile';
 import { GlassCard } from '@/components/GlassCard';
 import { RatingPill } from '@/components/RatingPill';
+import { openDirections } from '@/utils/openDirections';
 import { colors, radii, BOTTOM_TAB_PADDING } from '@/lib/theme';
 import type { PlaceRatingValue } from '@/schemas';
 
-const RATING_VALUES: PlaceRatingValue[] = ['loved_it', 'it_was_fine', 'not_for_me'];
+const RATING_VALUES: PlaceRatingValue[] = ['loved_it', 'it_was_fine', 'not_for_me', 'want_to_try'];
+const BEEN_THERE_VALUES: PlaceRatingValue[] = ['loved_it', 'it_was_fine', 'not_for_me'];
+
+type Tab = 'want_to_try' | 'been_there';
+
+function myRelationship(place: FavoritePlace, userId: string | undefined): Tab {
+  const mine = place.place_ratings.find((r) => r.user_id === userId)?.rating;
+  return mine && BEEN_THERE_VALUES.includes(mine) ? 'been_there' : 'want_to_try';
+}
 
 export default function PlacesScreen() {
   const router = useRouter();
   const { data: profile } = useProfile();
   const { data: places = [], isLoading, refetch, isRefetching } = useFavoritePlaces();
   const { mutateAsync: ratePlace } = useRatePlace();
+  const [tab, setTab] = useState<Tab>('want_to_try');
+
+  const filteredPlaces = places.filter((p) => myRelationship(p, profile?.id) === tab);
 
   return (
     <View style={styles.root}>
@@ -33,6 +46,29 @@ export default function PlacesScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.modeRow}>
+          <TouchableOpacity
+            style={[styles.modeChip, tab === 'want_to_try' && styles.modeChipActive]}
+            onPress={() => setTab('want_to_try')}
+            accessibilityRole="button"
+            accessibilityLabel="Want to try"
+          >
+            <Text style={[styles.modeChipText, tab === 'want_to_try' && styles.modeChipTextActive]}>
+              Want to try
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeChip, tab === 'been_there' && styles.modeChipActive]}
+            onPress={() => setTab('been_there')}
+            accessibilityRole="button"
+            accessibilityLabel="Been there"
+          >
+            <Text style={[styles.modeChipText, tab === 'been_there' && styles.modeChipTextActive]}>
+              Been there
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           refreshControl={
@@ -46,15 +82,19 @@ export default function PlacesScreen() {
         >
           {isLoading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
-          ) : places.length === 0 ? (
+          ) : filteredPlaces.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No places yet</Text>
+              <Text style={styles.emptyText}>
+                {tab === 'want_to_try' ? 'No places to try yet' : 'No places marked as been-there yet'}
+              </Text>
               <Text style={styles.emptyHint}>
-                Add a place you love, or wait for your group to add theirs.
+                {tab === 'want_to_try'
+                  ? 'Add a place you love, or wait for your group to add theirs.'
+                  : 'Rate a place you\'ve visited to see it here.'}
               </Text>
             </GlassCard>
           ) : (
-            places.map((place) => (
+            filteredPlaces.map((place) => (
               <PlaceCard
                 key={place.id}
                 place={place}
@@ -81,7 +121,7 @@ function PlaceCard({
   const counts = place.place_ratings.reduce<Record<PlaceRatingValue, number>>((acc, r) => {
     acc[r.rating] = (acc[r.rating] ?? 0) + 1;
     return acc;
-  }, { loved_it: 0, it_was_fine: 0, not_for_me: 0 });
+  }, { loved_it: 0, it_was_fine: 0, not_for_me: 0, want_to_try: 0 });
 
   const myRating = place.place_ratings.find((r) => r.user_id === currentUserId)?.rating;
   const isOwner = place.user_id === currentUserId;
@@ -98,7 +138,13 @@ function PlaceCard({
           )}
         </View>
         {place.address && (
-          <Text style={styles.placeAddress} numberOfLines={1}>{place.address}</Text>
+          <TouchableOpacity
+            onPress={() => openDirections(place.latitude, place.longitude, place.name)}
+            accessibilityRole="button"
+            accessibilityLabel={`Get directions to ${place.name}`}
+          >
+            <Text style={[styles.placeAddress, styles.addressLink]} numberOfLines={1}>{place.address}</Text>
+          </TouchableOpacity>
         )}
         <Text style={styles.attribution}>
           {isOwner ? 'Added by you' : `Added by ${place.profiles?.display_name ?? 'a group member'}`}
@@ -145,6 +191,20 @@ const styles = StyleSheet.create({
   },
   addBtnText: { fontSize: 14, fontWeight: '600', color: colors.text },
 
+  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
+  modeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  modeChipActive: { borderColor: colors.accent, backgroundColor: 'rgba(124,58,237,0.20)' },
+  modeChipText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  modeChipTextActive: { color: colors.accent },
+
   scroll: { paddingHorizontal: 16, paddingBottom: BOTTOM_TAB_PADDING + 16, gap: 10 },
 
   card: { padding: 14, gap: 6 },
@@ -160,6 +220,7 @@ const styles = StyleSheet.create({
   },
   categoryChipText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   placeAddress: { fontSize: 13, color: colors.textSecondary },
+  addressLink: { color: colors.accent },
   attribution: { fontSize: 12, color: colors.textTertiary },
 
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },

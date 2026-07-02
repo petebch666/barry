@@ -9,6 +9,7 @@ import { useSuggestPlace } from '@/hooks/usePlaces';
 import { usePing } from '@/hooks/usePings';
 import { useGroupFavoritePlaces } from '@/hooks/useFavoritePlaces';
 import { GlassCard } from '@/components/GlassCard';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { colors, radii } from '@/lib/theme';
 
 type Mode = 'favorites' | 'manual';
@@ -30,20 +31,17 @@ export default function SuggestPlaceModal() {
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [category, setCategory] = useState('');
 
   async function submit() {
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-
     if (!name.trim()) {
       Alert.alert('Name required', 'Please enter the venue name.');
       return;
     }
-    if (isNaN(lat) || isNaN(lng)) {
-      Alert.alert('Coordinates required', 'Enter valid latitude and longitude.');
+    if (latitude == null || longitude == null) {
+      Alert.alert('Address required', 'Search and select an address.');
       return;
     }
 
@@ -52,8 +50,8 @@ export default function SuggestPlaceModal() {
         ping_id: pingId,
         name: name.trim(),
         address: address.trim() || undefined,
-        latitude: lat,
-        longitude: lng,
+        latitude,
+        longitude,
         category: category.trim() || undefined,
       });
       router.back();
@@ -166,7 +164,7 @@ export default function SuggestPlaceModal() {
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <View style={styles.tipBox}>
               <Text style={styles.tip}>
-                Tip: Find the venue on any map app or openstreetmap.org, then copy its coordinates here.
+                Search for the address below and pick a match.
               </Text>
             </View>
 
@@ -182,14 +180,16 @@ export default function SuggestPlaceModal() {
               accessibilityLabel="Venue name"
             />
 
-            <Text style={styles.label}>Address</Text>
-            <TextInput
-              style={styles.input}
+            <Text style={styles.label}>Address *</Text>
+            <AddressAutocomplete
               value={address}
               onChangeText={setAddress}
-              placeholder="12 rue de Rivoli, Paris"
-              placeholderTextColor={colors.textTertiary}
-              accessibilityLabel="Address"
+              onSelect={(s) => {
+                setAddress(s.label);
+                setLatitude(s.latitude);
+                setLongitude(s.longitude);
+              }}
+              placeholder="Search for an address…"
             />
 
             <Text style={styles.label}>Category</Text>
@@ -201,33 +201,6 @@ export default function SuggestPlaceModal() {
               placeholderTextColor={colors.textTertiary}
               accessibilityLabel="Category"
             />
-
-            <View style={styles.coordRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Latitude *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={latitude}
-                  onChangeText={setLatitude}
-                  placeholder="48.8566"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="decimal-pad"
-                  accessibilityLabel="Latitude"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Longitude *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={longitude}
-                  onChangeText={setLongitude}
-                  placeholder="2.3522"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="decimal-pad"
-                  accessibilityLabel="Longitude"
-                />
-              </View>
-            </View>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -297,5 +270,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  coordRow: { flexDirection: 'row', gap: 12 },
 });

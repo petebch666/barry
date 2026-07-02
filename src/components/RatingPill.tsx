@@ -6,12 +6,14 @@ const RATING_COLOR: Record<PlaceRatingValue, string> = {
   loved_it: colors.success,
   it_was_fine: colors.warning,
   not_for_me: colors.error,
+  want_to_try: colors.accent,
 };
 
 const RATING_LABEL: Record<PlaceRatingValue, string> = {
   loved_it: 'Loved it',
   it_was_fine: 'It was fine',
   not_for_me: 'Not for me',
+  want_to_try: 'Want to try',
 };
 
 interface RatingPillProps {

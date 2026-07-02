@@ -158,7 +158,7 @@ export const UpdateSavedPlaceSchema = z.object({
 
 // ─── Place ratings ──────────────────────────────────────────────────────────────
 
-export const PlaceRatingValueSchema = z.enum(['loved_it', 'it_was_fine', 'not_for_me']);
+export const PlaceRatingValueSchema = z.enum(['loved_it', 'it_was_fine', 'not_for_me', 'want_to_try']);
 
 export const PlaceRatingSchema = z.object({
   id: z.string().uuid(),

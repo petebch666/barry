@@ -5,14 +5,17 @@ import { useFavoritePlaces, useRatePlace } from '@/hooks/useFavoritePlaces';
 import { useProfile, useDeleteSavedPlace } from '@/hooks/useProfile';
 import { GlassCard } from '@/components/GlassCard';
 import { RatingPill } from '@/components/RatingPill';
+import PlaceMapPreview from '@/components/PlaceMapPreview';
+import { openDirections } from '@/utils/openDirections';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
 import type { PlaceRatingValue } from '@/schemas';
 
-const RATING_VALUES: PlaceRatingValue[] = ['loved_it', 'it_was_fine', 'not_for_me'];
+const RATING_VALUES: PlaceRatingValue[] = ['loved_it', 'it_was_fine', 'not_for_me', 'want_to_try'];
 const RATING_LABEL: Record<PlaceRatingValue, string> = {
   loved_it: 'Loved it',
   it_was_fine: 'It was fine',
   not_for_me: 'Not for me',
+  want_to_try: 'Want to try',
 };
 
 export default function PlaceDetailScreen() {
@@ -68,7 +71,16 @@ export default function PlaceDetailScreen() {
           <GlassCard style={styles.section}>
             <Text style={styles.placeName}>{place.name}</Text>
             {place.category && <Text style={styles.category}>{place.category}</Text>}
-            {place.address && <Text style={styles.address}>{place.address}</Text>}
+            {place.address && (
+              <TouchableOpacity
+                onPress={() => openDirections(place.latitude, place.longitude, place.name)}
+                accessibilityRole="button"
+                accessibilityLabel={`Get directions to ${place.name}`}
+              >
+                <Text style={[styles.address, styles.addressLink]}>{place.address}</Text>
+              </TouchableOpacity>
+            )}
+            <PlaceMapPreview latitude={place.latitude} longitude={place.longitude} name={place.name} />
             <Text style={styles.attribution}>
               {isOwner ? 'Added by you' : `Added by ${place.profiles?.display_name ?? 'a group member'}`}
             </Text>
@@ -145,6 +157,7 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 22, fontWeight: '700', color: colors.text },
   category: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textTransform: 'capitalize' },
   address: { fontSize: 14, color: colors.textSecondary },
+  addressLink: { color: colors.accent },
   attribution: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   raterRow: {
