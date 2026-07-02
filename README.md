@@ -4,6 +4,8 @@ A social meetup coordination app for iOS and Android.
 
 Send a **ping** to a group of friends ("anyone for a drink tonight?"), let everyone RSVP, and let the app figure out where to meet. Barry computes the **geographic barycenter** of all members who are in and suggests nearby venues from OpenStreetMap. The group votes — with an optional vote timer so early agreement can't lock out slower voters — and everyone gets a push notification once a venue is confirmed.
 
+Beyond meetups, Barry is also about **recommending your favorite places to your friends** — the **Places** tab turns each user's saved-places list into a group-shared feed with lightweight ratings, so "you have to try this place" becomes something the app actually helps with.
+
 ---
 
 ## How it works
@@ -22,6 +24,16 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 
 ---
 
+## Places tab
+
+A `saved_places` row is visible to its owner and to anyone who shares at least one group with them (`shares_group_with()`, an RLS helper mirroring `is_group_member()`). Each group member can independently react to any place they can see — **Loved it / It was fine / Not for me / Want to try** — via `place_ratings` (one row per `(place, user)` pair, same shape as `votes`). A place with no rating from you, or an explicit "Want to try", shows under the tab's **Want to try** filter; any of the other three ratings moves it to **Been there**. Attribution ("Added by Sarah") and a live sentiment rollup ("2 loved it, 1 wants to try") make the group's collective opinion visible at a glance.
+
+Adding a place uses address **autocomplete via Base Adresse Nationale** (BAN — `api-adresse.data.gouv.fr`, France-only, free, no API key), which sets both the address text and coordinates in one step; the map (same Leaflet picker used elsewhere) is available afterward for fine-tuning the pin. The place detail screen shows a small read-only map preview, and the address is a tappable directions link everywhere it appears.
+
+The **"Suggest a place"** flow during voting can pull directly from a group's shared favorites instead of manual entry, closing the loop between "places you love" and "places you meet up at."
+
+---
+
 ## Tech stack
 
 | Layer | Choice |
@@ -31,8 +43,9 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 | Navigation | Expo Router v3 (file-based) |
 | Backend | Supabase (PostgreSQL + Realtime + Edge Functions) |
 | Auth | Apple Sign In + Email/Password via Supabase |
-| Maps | react-native-webview + Leaflet.js + OpenStreetMap tiles (native only) |
+| Maps | react-native-webview (native) / iframe (web) + Leaflet.js + OpenStreetMap tiles |
 | Places | OpenStreetMap Overpass API (server-side, no API key required) |
+| Address autocomplete | Base Adresse Nationale (BAN) — France, free, no API key |
 | Location | expo-location (foreground, per-ping opt-in) |
 | Push | expo-notifications + Expo Push API |
 | Data fetching | TanStack React Query v5 |
@@ -51,20 +64,22 @@ barry/                          ← git root and Expo project root
 │   ├── (auth)/                 ← Sign-in screen
 │   ├── (app)/                  ← Authenticated app (bottom tabs)
 │   │   ├── (feed)/             ← Ping feed + ping detail
+│   │   ├── (places)/           ← Places tab: group-shared favorites + ratings
 │   │   ├── (groups)/           ← Groups list + group detail
 │   │   ├── (map)/              ← Full-screen map tab
-│   │   └── (profile)/          ← Profile + saved places
+│   │   └── (profile)/          ← Profile + saved-places summary
 │   ├── create-group.tsx        ← Modal
 │   ├── create-ping.tsx         ← Modal
+│   ├── add-saved-place.tsx     ← Add/edit a place (BAN autocomplete + map)
 │   ├── rsvp/[pingId].tsx       ← RSVP modal (in/out/maybe + location)
-│   ├── suggest-place/[pingId]  ← Suggest a venue modal
+│   ├── suggest-place/[pingId]  ← Suggest a venue modal (favorites picker + manual)
 │   └── join/[code].tsx         ← Invite deep-link landing
 ├── src/
 │   ├── hooks/                  ← React Query hooks (one file per domain)
 │   ├── lib/                    ← Supabase client singleton + theme
 │   ├── schemas/                ← Zod schemas + inferred TypeScript types
 │   ├── types/                  ← database.types.ts (Supabase generated)
-│   └── utils/                  ← Pure utilities (barycenter, haversine)
+│   └── utils/                  ← Pure utilities (barycenter, haversine, searchAddress)
 ├── supabase/
 │   ├── migrations/             ← SQL migrations (schema, RLS, triggers)
 │   ├── functions/              ← Deno Edge Functions (DB Webhooks + one cron-scheduled)
@@ -277,7 +292,7 @@ npx supabase start
 npx supabase test db
 ```
 
-Covers RLS policies plus the `start_ping_voting` RPC (timer deadline stamping, idempotency once voting has started, and that only the creator/an admin can start voting on a ping).
+Covers RLS policies plus the `start_ping_voting` RPC (timer deadline stamping, idempotency once voting has started, and that only the creator/an admin can start voting on a ping), and the Places sharing model (`saved_places`/`place_ratings` visibility across shared groups, owner-only writes, rating authorization, cascade delete on place removal).
 
 ---
 
