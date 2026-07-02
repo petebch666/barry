@@ -11,11 +11,12 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useSavePlace } from '@/hooks/useProfile';
-import { AddSavedPlaceSchema } from '@/schemas';
+import { useFavoritePlaces, useUpdateSavedPlace } from '@/hooks/useFavoritePlaces';
+import { AddSavedPlaceSchema, UpdateSavedPlaceSchema } from '@/schemas';
 import { reverseGeocode } from '@/utils/reverseGeocode';
 import { colors, radii } from '@/lib/theme';
 import PinMapPicker from '@/components/PinMapPicker';
@@ -25,7 +26,12 @@ const CATEGORY_CHIPS = ['bar', 'restaurant', 'café', 'parc', 'autre'];
 
 export default function AddSavedPlaceScreen() {
   const router = useRouter();
-  const { mutateAsync: savePlace, isPending } = useSavePlace();
+  const { placeId } = useLocalSearchParams<{ placeId?: string }>();
+  const isEditing = !!placeId;
+  const { mutateAsync: savePlace, isPending: isSaving } = useSavePlace();
+  const { mutateAsync: updatePlace, isPending: isUpdating } = useUpdateSavedPlace();
+  const { data: favoritePlaces } = useFavoritePlaces();
+  const isPending = isSaving || isUpdating;
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -35,13 +41,28 @@ export default function AddSavedPlaceScreen() {
   const [locationReady, setLocationReady] = useState(Platform.OS === 'web');
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
   const addressEditedByUser = useRef(false);
+  const prefilled = useRef(false);
 
   // Web-only manual coordinate inputs
   const [latText, setLatText] = useState('');
   const [lngText, setLngText] = useState('');
 
+  // Prefill from the existing place when editing. Location isn't editable
+  // (UpdateSavedPlaceSchema only covers name/address/category), so the
+  // location-picking UI is hidden entirely in edit mode instead.
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (!isEditing || prefilled.current || !favoritePlaces) return;
+    const existing = favoritePlaces.find((p) => p.id === placeId);
+    if (!existing) return;
+    setName(existing.name);
+    setAddress(existing.address ?? '');
+    setCategory(existing.category ?? '');
+    addressEditedByUser.current = true;
+    prefilled.current = true;
+  }, [isEditing, placeId, favoritePlaces]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || isEditing) return;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -57,7 +78,7 @@ export default function AddSavedPlaceScreen() {
         setLocationReady(true);
       }
     })();
-  }, []);
+  }, [isEditing]);
 
   async function handleLocationChange(loc: { latitude: number; longitude: number }) {
     setLocation(loc);
@@ -74,6 +95,25 @@ export default function AddSavedPlaceScreen() {
   }
 
   async function submit() {
+    if (isEditing) {
+      const parsed = UpdateSavedPlaceSchema.safeParse({
+        name: name.trim(),
+        address: address.trim() || null,
+        category: category.trim() || null,
+      });
+      if (!parsed.success) {
+        Alert.alert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
+        return;
+      }
+      try {
+        await updatePlace({ placeId: placeId!, updates: parsed.data });
+        router.back();
+      } catch (err) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Could not update place.');
+      }
+      return;
+    }
+
     const lat = Platform.OS === 'web' ? parseFloat(latText) : location.latitude;
     const lng = Platform.OS === 'web' ? parseFloat(lngText) : location.longitude;
 
@@ -91,16 +131,21 @@ export default function AddSavedPlaceScreen() {
     }
 
     try {
-      await savePlace({ ...parsed.data, osm_id: null });
+      await savePlace({
+        ...parsed.data,
+        address: parsed.data.address ?? null,
+        category: parsed.data.category ?? null,
+        osm_id: null,
+      });
       router.back();
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not save place.');
     }
   }
 
-  const canSubmit =
-    !!name.trim() &&
-    (Platform.OS !== 'web' || (latText.trim() !== '' && lngText.trim() !== ''));
+  const canSubmit = isEditing
+    ? !!name.trim()
+    : !!name.trim() && (Platform.OS !== 'web' || (latText.trim() !== '' && lngText.trim() !== ''));
 
   return (
     <KeyboardAvoidingView
@@ -116,7 +161,7 @@ export default function AddSavedPlaceScreen() {
           >
             <Text style={styles.cancel}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Add Place</Text>
+          <Text style={styles.title}>{isEditing ? 'Edit Place' : 'Add Place'}</Text>
           <TouchableOpacity
             onPress={submit}
             disabled={isPending || !canSubmit}
@@ -173,7 +218,9 @@ export default function AddSavedPlaceScreen() {
             accessibilityLabel="Category"
           />
 
-          {Platform.OS === 'web' ? (
+          {isEditing ? (
+            <Text style={styles.hint}>Location can't be changed after saving — remove and re-add the place if it moved.</Text>
+          ) : Platform.OS === 'web' ? (
             <View style={styles.coordRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Latitude *</Text>

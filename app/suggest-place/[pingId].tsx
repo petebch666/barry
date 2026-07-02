@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, ScrollView,
@@ -6,12 +6,27 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSuggestPlace } from '@/hooks/usePlaces';
+import { usePing } from '@/hooks/usePings';
+import { useGroupFavoritePlaces } from '@/hooks/useFavoritePlaces';
+import { GlassCard } from '@/components/GlassCard';
 import { colors, radii } from '@/lib/theme';
+
+type Mode = 'favorites' | 'manual';
 
 export default function SuggestPlaceModal() {
   const { pingId } = useLocalSearchParams<{ pingId: string }>();
   const router = useRouter();
   const { mutateAsync: suggestPlace, isPending } = useSuggestPlace();
+  const { data: ping } = usePing(pingId);
+  const { data: favoritePlaces = [] } = useGroupFavoritePlaces(ping?.group_id ?? '');
+
+  const [mode, setMode] = useState<Mode>('manual');
+  const [defaultModeSet, setDefaultModeSet] = useState(false);
+  useEffect(() => {
+    if (defaultModeSet || !ping) return;
+    setMode(favoritePlaces.length > 0 ? 'favorites' : 'manual');
+    setDefaultModeSet(true);
+  }, [defaultModeSet, ping, favoritePlaces.length]);
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -47,6 +62,22 @@ export default function SuggestPlaceModal() {
     }
   }
 
+  async function submitFavorite(place: { name: string; address: string | null; latitude: number; longitude: number; category: string | null }) {
+    try {
+      await suggestPlace({
+        ping_id: pingId,
+        name: place.name,
+        address: place.address ?? undefined,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        category: place.category ?? undefined,
+      });
+      router.back();
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not add place.');
+    }
+  }
+
   const canAdd = !!name.trim();
 
   return (
@@ -57,86 +88,148 @@ export default function SuggestPlaceModal() {
             <Text style={styles.cancel}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Suggest a Place</Text>
+          {mode === 'manual' ? (
+            <TouchableOpacity
+              onPress={submit}
+              disabled={isPending || !canAdd}
+              accessibilityRole="button"
+              accessibilityLabel="Add place"
+            >
+              {isPending ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Text style={[styles.add, !canAdd && styles.addDisabled]}>Add</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+        </View>
+
+        <View style={styles.modeRow}>
           <TouchableOpacity
-            onPress={submit}
-            disabled={isPending || !canAdd}
+            style={[styles.modeChip, mode === 'favorites' && styles.modeChipActive]}
+            onPress={() => setMode('favorites')}
             accessibilityRole="button"
-            accessibilityLabel="Add place"
+            accessibilityLabel="From your favorites"
           >
-            {isPending ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <Text style={[styles.add, !canAdd && styles.addDisabled]}>Add</Text>
-            )}
+            <Text style={[styles.modeChipText, mode === 'favorites' && styles.modeChipTextActive]}>
+              From your favorites
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeChip, mode === 'manual' && styles.modeChipActive]}
+            onPress={() => setMode('manual')}
+            accessibilityRole="button"
+            accessibilityLabel="Manual entry"
+          >
+            <Text style={[styles.modeChipText, mode === 'manual' && styles.modeChipTextActive]}>
+              Manual entry
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <View style={styles.tipBox}>
-            <Text style={styles.tip}>
-              Tip: Find the venue on any map app or openstreetmap.org, then copy its coordinates here.
-            </Text>
-          </View>
-
-          <Text style={styles.label}>Venue name *</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Le Bar du Coin"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={200}
-            autoFocus
-            accessibilityLabel="Venue name"
-          />
-
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="12 rue de Rivoli, Paris"
-            placeholderTextColor={colors.textTertiary}
-            accessibilityLabel="Address"
-          />
-
-          <Text style={styles.label}>Category</Text>
-          <TextInput
-            style={styles.input}
-            value={category}
-            onChangeText={setCategory}
-            placeholder="bar / restaurant / café…"
-            placeholderTextColor={colors.textTertiary}
-            accessibilityLabel="Category"
-          />
-
-          <View style={styles.coordRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Latitude *</Text>
-              <TextInput
-                style={styles.input}
-                value={latitude}
-                onChangeText={setLatitude}
-                placeholder="48.8566"
-                placeholderTextColor={colors.textTertiary}
-                keyboardType="decimal-pad"
-                accessibilityLabel="Latitude"
-              />
+        {mode === 'favorites' ? (
+          <ScrollView contentContainerStyle={styles.form}>
+            {favoritePlaces.length === 0 ? (
+              <View style={styles.tipBox}>
+                <Text style={styles.tip}>
+                  No favorite places saved by your group yet — switch to manual entry, or add one from the Places tab.
+                </Text>
+              </View>
+            ) : (
+              favoritePlaces.map((place) => (
+                <TouchableOpacity
+                  key={place.id}
+                  onPress={() => submitFavorite(place)}
+                  disabled={isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Suggest ${place.name}`}
+                  activeOpacity={0.75}
+                >
+                  <GlassCard style={styles.favoriteRow}>
+                    <View style={styles.favoriteInfo}>
+                      <Text style={styles.favoriteName}>{place.name}</Text>
+                      {place.address && (
+                        <Text style={styles.favoriteAddress} numberOfLines={1}>{place.address}</Text>
+                      )}
+                      <Text style={styles.favoriteAttribution}>
+                        Added by {place.profiles?.display_name ?? 'a group member'}
+                      </Text>
+                    </View>
+                  </GlassCard>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+            <View style={styles.tipBox}>
+              <Text style={styles.tip}>
+                Tip: Find the venue on any map app or openstreetmap.org, then copy its coordinates here.
+              </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Longitude *</Text>
-              <TextInput
-                style={styles.input}
-                value={longitude}
-                onChangeText={setLongitude}
-                placeholder="2.3522"
-                placeholderTextColor={colors.textTertiary}
-                keyboardType="decimal-pad"
-                accessibilityLabel="Longitude"
-              />
+
+            <Text style={styles.label}>Venue name *</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Le Bar du Coin"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={200}
+              autoFocus
+              accessibilityLabel="Venue name"
+            />
+
+            <Text style={styles.label}>Address</Text>
+            <TextInput
+              style={styles.input}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="12 rue de Rivoli, Paris"
+              placeholderTextColor={colors.textTertiary}
+              accessibilityLabel="Address"
+            />
+
+            <Text style={styles.label}>Category</Text>
+            <TextInput
+              style={styles.input}
+              value={category}
+              onChangeText={setCategory}
+              placeholder="bar / restaurant / café…"
+              placeholderTextColor={colors.textTertiary}
+              accessibilityLabel="Category"
+            />
+
+            <View style={styles.coordRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Latitude *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={latitude}
+                  onChangeText={setLatitude}
+                  placeholder="48.8566"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel="Latitude"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Longitude *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={longitude}
+                  onChangeText={setLongitude}
+                  placeholder="2.3522"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel="Longitude"
+                />
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -157,6 +250,24 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '600', color: colors.text },
   add: { fontSize: 16, fontWeight: '600', color: colors.accent },
   addDisabled: { color: colors.textTertiary },
+  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 16 },
+  modeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  modeChipActive: { borderColor: colors.accent, backgroundColor: 'rgba(124,58,237,0.20)' },
+  modeChipText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  modeChipTextActive: { color: colors.accent },
+  favoriteRow: { padding: 14, gap: 4 },
+  favoriteInfo: { gap: 2 },
+  favoriteName: { fontSize: 16, fontWeight: '700', color: colors.text },
+  favoriteAddress: { fontSize: 13, color: colors.textSecondary },
+  favoriteAttribution: { fontSize: 12, color: colors.textTertiary },
   form: { padding: 20, gap: 6 },
   tipBox: {
     backgroundColor: colors.surface,

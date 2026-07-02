@@ -7,6 +7,7 @@ import { colors } from '@/lib/theme';
 
 const TABS = [
   { name: '(feed)', icon: '◎', label: 'Feed' },
+  { name: '(places)', icon: '♥', label: 'Places' },
   { name: '(profile)', icon: '◌', label: 'Me' },
 ] as const;
 
@@ -65,6 +66,7 @@ export default function AppLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="(feed)" />
+      <Tabs.Screen name="(places)" />
       <Tabs.Screen name="(groups)" options={{ href: null }} />
       <Tabs.Screen name="(map)" options={{ href: null }} />
       <Tabs.Screen name="(profile)" />

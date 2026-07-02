@@ -150,6 +150,30 @@ export const AddSavedPlaceSchema = z.object({
   category: z.string().max(100).optional(),
 });
 
+export const UpdateSavedPlaceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200).optional(),
+  address: z.string().max(500).nullable().optional(),
+  category: z.string().max(100).nullable().optional(),
+});
+
+// ─── Place ratings ──────────────────────────────────────────────────────────────
+
+export const PlaceRatingValueSchema = z.enum(['loved_it', 'it_was_fine', 'not_for_me']);
+
+export const PlaceRatingSchema = z.object({
+  id: z.string().uuid(),
+  place_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  rating: PlaceRatingValueSchema,
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export const RatePlaceSchema = z.object({
+  place_id: z.string().uuid(),
+  rating: PlaceRatingValueSchema,
+});
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const EmailAuthSchema = z.object({
@@ -175,4 +199,8 @@ export type Vote = z.infer<typeof VoteSchema>;
 export type CastVote = z.infer<typeof CastVoteSchema>;
 export type SavedPlace = z.infer<typeof SavedPlaceSchema>;
 export type AddSavedPlace = z.infer<typeof AddSavedPlaceSchema>;
+export type UpdateSavedPlace = z.infer<typeof UpdateSavedPlaceSchema>;
+export type PlaceRatingValue = z.infer<typeof PlaceRatingValueSchema>;
+export type PlaceRating = z.infer<typeof PlaceRatingSchema>;
+export type RatePlace = z.infer<typeof RatePlaceSchema>;
 export type EmailAuth = z.infer<typeof EmailAuthSchema>;

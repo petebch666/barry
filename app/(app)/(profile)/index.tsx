@@ -16,13 +16,13 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
-import { useProfile, useUpdateProfile, useSavedPlaces, useDeleteSavedPlace } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile, useSavedPlaces } from '@/hooks/useProfile';
 import { useGroups, useJoinGroup } from '@/hooks/useGroups';
 import { deregisterPushToken } from '@/hooks/usePushToken';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
 import { colors, radii, BOTTOM_TAB_PADDING } from '@/lib/theme';
-import type { Group, SavedPlace } from '@/schemas';
+import type { Group } from '@/schemas';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -31,7 +31,6 @@ export default function ProfileScreen() {
   const { data: savedPlaces = [], isLoading: placesLoading } = useSavedPlaces();
   const { mutateAsync: joinGroup, isPending: isJoining } = useJoinGroup();
   const { mutateAsync: updateProfile, isPending: isSavingName } = useUpdateProfile();
-  const { mutateAsync: deletePlace } = useDeleteSavedPlace();
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -95,23 +94,6 @@ export default function ProfileScreen() {
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Invalid invite code.');
     }
-  }
-
-  async function handleDeletePlace(placeId: string, placeName: string) {
-    Alert.alert('Remove saved place', `Remove "${placeName}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletePlace(placeId);
-          } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Could not remove place.');
-          }
-        },
-      },
-    ]);
   }
 
   return (
@@ -202,35 +184,26 @@ export default function ProfileScreen() {
           {/* ── Saved Places section ── */}
           <View style={[styles.sectionHeader, { marginTop: 8 }]}>
             <Text style={styles.sectionTitle}>Saved Places</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/add-saved-place')}
-              style={[styles.sectionBtn, styles.sectionBtnPrimary]}
-              accessibilityRole="button"
-              accessibilityLabel="Add a saved place"
-            >
-              <Text style={[styles.sectionBtnText, styles.sectionBtnTextPrimary]}>+ Add</Text>
-            </TouchableOpacity>
           </View>
 
           {placesLoading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
-          ) : savedPlaces.length === 0 ? (
-            <GlassCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No saved places</Text>
-              <Text style={styles.emptyHint}>
-                Tap + Add to save a place, or ♡ a venue during voting.
-              </Text>
-            </GlassCard>
           ) : (
-            <View style={styles.groupsList}>
-              {savedPlaces.map((place) => (
-                <SavedPlaceRow
-                  key={place.id}
-                  place={place}
-                  onDelete={() => handleDeletePlace(place.id, place.name)}
-                />
-              ))}
-            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/(places)' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="See all places"
+              activeOpacity={0.75}
+            >
+              <GlassCard style={styles.placesSummaryCard}>
+                <Text style={styles.placesSummaryText}>
+                  {savedPlaces.length === 0
+                    ? 'No places saved yet'
+                    : `You have saved ${savedPlaces.length} place${savedPlaces.length === 1 ? '' : 's'}`}
+                </Text>
+                <Text style={styles.chevron}>›</Text>
+              </GlassCard>
+            </TouchableOpacity>
           )}
 
           {/* ── Settings / Sign out ── */}
@@ -325,32 +298,6 @@ function GroupRow({ group }: { group: Group }) {
   );
 }
 
-function SavedPlaceRow({ place, onDelete }: { place: SavedPlace; onDelete: () => void }) {
-  return (
-    <GlassCard style={styles.savedPlaceRow}>
-      <View style={styles.savedPlaceIcon}>
-        <Text style={styles.savedPlaceEmoji}>♥</Text>
-      </View>
-      <View style={styles.savedPlaceInfo}>
-        <Text style={styles.savedPlaceName}>{place.name}</Text>
-        {place.address ? (
-          <Text style={styles.savedPlaceAddr} numberOfLines={1}>{place.address}</Text>
-        ) : place.category ? (
-          <Text style={styles.savedPlaceAddr}>{place.category}</Text>
-        ) : null}
-      </View>
-      <TouchableOpacity
-        onPress={onDelete}
-        style={styles.deleteBtn}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove ${place.name}`}
-      >
-        <Text style={styles.deleteBtnText}>×</Text>
-      </TouchableOpacity>
-    </GlassCard>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1 },
@@ -420,28 +367,13 @@ const styles = StyleSheet.create({
   groupDesc: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   chevron: { fontSize: 20, color: colors.textTertiary },
 
-  savedPlaceRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  savedPlaceIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(239,68,68,0.15)',
+  placesSummaryCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
   },
-  savedPlaceEmoji: { fontSize: 16, color: colors.error },
-  savedPlaceInfo: { flex: 1 },
-  savedPlaceName: { fontSize: 15, fontWeight: '600', color: colors.text },
-  savedPlaceAddr: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  deleteBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtnText: { fontSize: 18, color: colors.textSecondary, lineHeight: 22 },
+  placesSummaryText: { fontSize: 15, fontWeight: '600', color: colors.text },
 
   emptyCard: { padding: 24, alignItems: 'center', gap: 6 },
   emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },

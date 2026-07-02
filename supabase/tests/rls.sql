@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(22);
+SELECT plan(30);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -294,6 +294,77 @@ SELECT results_eq(
      ) $$,
   ARRAY[0],
   'request_more_places is capped at 3 batches'
+);
+
+-- ─── Test: saved_places sharing + place_ratings (Places tab feature) ──
+-- Alice and Bob already share "Test Group" (seeded at the top); Charlie
+-- shares no group with either.
+INSERT INTO saved_places (id, user_id, name, latitude, longitude)
+VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('alice'), 'Le Comptoir', 48.8566, 2.3522);
+
+SELECT tests.authenticate_as('bob');
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM saved_places WHERE name = 'Le Comptoir' $$,
+  ARRAY[1],
+  'group member can read a shared-group place'
+);
+
+SELECT tests.authenticate_as('charlie');
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM saved_places WHERE name = 'Le Comptoir' $$,
+  ARRAY[0],
+  'non-group member cannot read another user''s place'
+);
+
+SELECT tests.authenticate_as('bob');
+SELECT lives_ok(
+  $$ INSERT INTO place_ratings (place_id, user_id, rating)
+     VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('bob'), 'loved_it') $$,
+  'group member can rate a place they can see'
+);
+
+SELECT tests.authenticate_as('charlie');
+SELECT throws_ok(
+  $$ INSERT INTO place_ratings (place_id, user_id, rating)
+     VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('charlie'), 'loved_it') $$,
+  NULL,
+  'non-group member cannot rate a place they cannot see'
+);
+
+-- Bob attempts to modify Alice's place directly — still owner-only for
+-- writes; the UPDATE's USING clause silently matches zero rows.
+SELECT tests.authenticate_as('bob');
+UPDATE saved_places SET name = 'Hacked' WHERE id = '11111111-1111-1111-1111-111111111111';
+
+SELECT tests.authenticate_as('alice');
+SELECT results_eq(
+  $$ SELECT name FROM saved_places WHERE id = '11111111-1111-1111-1111-111111111111' $$,
+  ARRAY['Le Comptoir'],
+  'non-owner update of a shared place is silently blocked by RLS'
+);
+
+-- Alice adds her own rating; both ratings become readable by any group member.
+INSERT INTO place_ratings (place_id, user_id, rating)
+VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('alice'), 'it_was_fine');
+
+SELECT tests.authenticate_as('bob');
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM place_ratings WHERE place_id = '11111111-1111-1111-1111-111111111111' $$,
+  ARRAY[2],
+  'both ratings on a shared place are readable by any group member'
+);
+
+-- Owner deletes their own place — succeeds, cascades to place_ratings.
+SELECT tests.authenticate_as('alice');
+SELECT lives_ok(
+  $$ DELETE FROM saved_places WHERE id = '11111111-1111-1111-1111-111111111111' $$,
+  'owner can delete their own place'
+);
+
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM place_ratings WHERE place_id = '11111111-1111-1111-1111-111111111111' $$,
+  ARRAY[0],
+  'deleting a place cascades to its ratings'
 );
 
 SELECT * FROM finish();
