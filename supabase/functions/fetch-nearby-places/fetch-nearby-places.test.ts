@@ -130,14 +130,14 @@ Deno.test('haversine — points <10 m apart give near-zero distance', () => {
 
 // ─── Overpass query builder ───────────────────────────────────────────────────
 
-function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
+function buildOverpassQuery(lat: number, lng: number, radiusM: number, limit = 30): string {
   return [
     '[out:json][timeout:25];',
     '(',
     `  node["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
     `  way["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
     ');',
-    'out body center;',
+    `out body center ${limit};`,
   ].join('\n');
 }
 
@@ -149,6 +149,11 @@ Deno.test('overpass query — contains expected amenity filter', () => {
   assertStringIncludes(q, '48.86');
   assertStringIncludes(q, '2.35');
   assertStringIncludes(q, 'out body center');
+});
+
+Deno.test('overpass query — result limit is applied server-side', () => {
+  const q = buildOverpassQuery(48.86, 2.35, 800, 30);
+  assertStringIncludes(q, 'out body center 30;');
 });
 
 Deno.test('overpass query — excludes cafe/pub/biergarten/fast_food (spec: restaurant/bar only)', () => {
@@ -259,4 +264,72 @@ Deno.test('parseOsmElement — no address tags gives null address', () => {
 Deno.test('parseOsmElement — missing lat/lon on node returns null', () => {
   const el: OsmElement = { type: 'node', id: 7, tags: { name: 'Ghost Bar', amenity: 'bar' } };
   assertEquals(parseOsmElement(el), null);
+});
+
+// ─── "Find more places" batching logic ────────────────────────────────────────
+
+function shouldFetchBatch(maxExistingBatch: number, requestedBatch: number): boolean {
+  return maxExistingBatch < requestedBatch;
+}
+
+function overpassLimitForBatch(baseLimit: number, batch: number): number {
+  return baseLimit * batch;
+}
+
+function dedupeNewOsmResults(
+  elements: { externalId: string; hasNameAndCoords: boolean }[],
+  existingExternalIds: Set<string>,
+  maxPlaces: number,
+): string[] {
+  const kept: string[] = [];
+  for (const el of elements) {
+    if (kept.length >= maxPlaces) break;
+    if (!el.hasNameAndCoords) continue;
+    if (existingExternalIds.has(el.externalId)) continue;
+    kept.push(el.externalId);
+  }
+  return kept;
+}
+
+Deno.test('shouldFetchBatch — first fetch (no existing places) proceeds', () => {
+  assertEquals(shouldFetchBatch(0, 1), true);
+});
+
+Deno.test('shouldFetchBatch — re-delivery of the same batch is skipped', () => {
+  assertEquals(shouldFetchBatch(1, 1), false);
+});
+
+Deno.test('shouldFetchBatch — a bumped places_batch proceeds', () => {
+  assertEquals(shouldFetchBatch(1, 2), true);
+});
+
+Deno.test('overpassLimitForBatch — scales with batch number', () => {
+  assertEquals(overpassLimitForBatch(30, 1), 30);
+  assertEquals(overpassLimitForBatch(30, 2), 60);
+  assertEquals(overpassLimitForBatch(30, 3), 90);
+});
+
+Deno.test('dedupeNewOsmResults — skips elements already present by external_id', () => {
+  const elements = [
+    { externalId: 'node/1', hasNameAndCoords: true },
+    { externalId: 'node/2', hasNameAndCoords: true },
+    { externalId: 'node/3', hasNameAndCoords: true },
+  ];
+  const kept = dedupeNewOsmResults(elements, new Set(['node/1']), 8);
+  assertEquals(kept, ['node/2', 'node/3']);
+});
+
+Deno.test('dedupeNewOsmResults — stops once maxPlaces new results are found', () => {
+  const elements = Array.from({ length: 20 }, (_, i) => ({ externalId: `node/${i}`, hasNameAndCoords: true }));
+  const kept = dedupeNewOsmResults(elements, new Set(), 8);
+  assertEquals(kept.length, 8);
+});
+
+Deno.test('dedupeNewOsmResults — skips elements without a name/coords', () => {
+  const elements = [
+    { externalId: 'node/1', hasNameAndCoords: false },
+    { externalId: 'node/2', hasNameAndCoords: true },
+  ];
+  const kept = dedupeNewOsmResults(elements, new Set(), 8);
+  assertEquals(kept, ['node/2']);
 });

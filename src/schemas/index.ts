@@ -48,6 +48,7 @@ export const PingSchema = z.object({
   expires_at: z.string().datetime(),
   vote_timer_minutes: z.number().int().positive().nullable(),
   voting_deadline: z.string().datetime().nullable(),
+  places_batch: z.number().int().min(1).max(3),
   created_at: z.string().datetime(),
 });
 
@@ -96,6 +97,7 @@ export const PlaceSchema = z.object({
   photo_url: z.string().url().nullable(),
   rating: z.number().min(0).max(5).nullable(),
   suggested_by: z.string().uuid().nullable(),
+  batch: z.number().int().min(1).max(3),
   created_at: z.string().datetime(),
 });
 

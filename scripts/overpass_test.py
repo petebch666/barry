@@ -4,9 +4,11 @@ supabase/functions/fetch-nearby-places/index.ts — runs the exact same
 query directly against Overpass, with no Supabase/webhook plumbing, to
 verify Overpass itself returns data for a given coordinate.
 
-Usage: python scripts/overpass_test.py
+Usage: python scripts/overpass_test.py [latitude longitude]
+       (defaults to a fixed test coordinate if omitted)
 """
 import json
+import sys
 import urllib.request
 import urllib.parse
 
@@ -14,6 +16,7 @@ LATITUDE = 48.90532288698502
 LONGITUDE = 2.338147166002216
 
 SEARCH_RADIUS_M = 400
+OVERPASS_RESULT_LIMIT = 30  # matches fetch-nearby-places/index.ts
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
@@ -21,14 +24,14 @@ OVERPASS_MIRRORS = [
 ]
 
 
-def build_query(lat: float, lng: float, radius_m: int) -> str:
+def build_query(lat: float, lng: float, radius_m: int, limit: int = OVERPASS_RESULT_LIMIT) -> str:
     return "\n".join([
         "[out:json][timeout:25];",
         "(",
         f'  node["amenity"~"^(restaurant|bar)$"](around:{radius_m},{lat},{lng});',
         f'  way["amenity"~"^(restaurant|bar)$"](around:{radius_m},{lat},{lng});',
         ");",
-        "out body center;",
+        f"out body center {limit};",
     ])
 
 
@@ -75,9 +78,14 @@ def parse_element(el: dict) -> dict | None:
 
 
 def main() -> None:
-    query = build_query(LATITUDE, LONGITUDE, SEARCH_RADIUS_M)
+    if len(sys.argv) >= 3:
+        lat, lng = float(sys.argv[1]), float(sys.argv[2])
+    else:
+        lat, lng = LATITUDE, LONGITUDE
+
+    query = build_query(lat, lng, SEARCH_RADIUS_M)
     print(f"Querying Overpass for restaurant|bar within {SEARCH_RADIUS_M}m of "
-          f"({LATITUDE}, {LONGITUDE})...\n")
+          f"({lat}, {lng})...\n")
 
     elements = fetch_elements(query)
     print(f"Raw elements returned: {len(elements)}")

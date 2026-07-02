@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { usePing, usePingRealtime, useStartVoting, useCancelPing } from '@/hooks/usePings';
+import { usePing, usePingRealtime, useStartVoting, useCancelPing, useRequestMorePlaces } from '@/hooks/usePings';
 import { useRsvps, useRsvpsRealtime, useMyRsvp, useUpsertRsvp } from '@/hooks/useRsvps';
 import { usePlaces, usePlacesRealtime } from '@/hooks/usePlaces';
 import { useVotes, useVotesRealtime, useCastVote, useMyVote, useVoteCounts } from '@/hooks/useVotes';
@@ -69,6 +69,7 @@ export default function PingDetailScreen() {
   }, [ping?.status, ping?.voting_deadline]);
 
   const { mutateAsync: startVoting, isPending: isStartingVoting } = useStartVoting();
+  const { mutateAsync: requestMorePlaces, isPending: isRequestingMorePlaces } = useRequestMorePlaces();
   const { mutateAsync: cancelPing, isPending: isCancelling } = useCancelPing();
   const { mutateAsync: castVote, isPending: isCasting } = useCastVote();
   const { mutateAsync: savePlace } = useSavePlace();
@@ -253,6 +254,22 @@ export default function PingDetailScreen() {
                   accessibilityLabel="Suggest a place"
                 >
                   <Text style={styles.suggestBtnText}>+ Suggest a place</Text>
+                </TouchableOpacity>
+              )}
+
+              {ping.status === 'voting' && myRsvp?.status === 'in' && ping.places_batch < 3 && (
+                <TouchableOpacity
+                  style={[styles.suggestBtn, isRequestingMorePlaces && { opacity: 0.5 }]}
+                  onPress={() => requestMorePlaces(pingId)}
+                  disabled={isRequestingMorePlaces}
+                  accessibilityRole="button"
+                  accessibilityLabel="Find more places"
+                >
+                  {isRequestingMorePlaces ? (
+                    <ActivityIndicator color={colors.textSecondary} />
+                  ) : (
+                    <Text style={styles.suggestBtnText}>Find more places →</Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>

@@ -11,7 +11,7 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 1. **Ping** — send a ping to one of your groups with a message, an optional proposed time, and an optional **vote timer** (15m/30m/1h/2h)
 2. **RSVP** — members respond in/out/maybe; "in" members can optionally share their current location
 3. **Barycenter** — the app computes the arithmetic mean of all "in" members' locations
-4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list
+4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list. If the first 8 don't satisfy the group, any "in" member can tap **"Find more places"** for another round (up to 3 rounds total)
 5. **Vote** — members vote for their preferred venue; any member can also suggest an additional place
 6. **Confirm** —
    - **No vote timer set:** as soon as >50% of "in" members vote for the same venue, the meetup is confirmed.

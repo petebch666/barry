@@ -122,6 +122,7 @@ export type Database = {
           group_id: string
           id: string
           message: string
+          places_batch: number
           proposed_time: string | null
           status: string
           vote_timer_minutes: number | null
@@ -135,6 +136,7 @@ export type Database = {
           group_id: string
           id?: string
           message: string
+          places_batch?: number
           proposed_time?: string | null
           status?: string
           vote_timer_minutes?: number | null
@@ -148,6 +150,7 @@ export type Database = {
           group_id?: string
           id?: string
           message?: string
+          places_batch?: number
           proposed_time?: string | null
           status?: string
           vote_timer_minutes?: number | null
@@ -180,6 +183,7 @@ export type Database = {
       places: {
         Row: {
           address: string | null
+          batch: number
           category: string | null
           created_at: string
           external_id: string | null
@@ -195,6 +199,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          batch?: number
           category?: string | null
           created_at?: string
           external_id?: string | null
@@ -210,6 +215,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          batch?: number
           category?: string | null
           created_at?: string
           external_id?: string | null
@@ -451,6 +457,29 @@ export type Database = {
         }[]
       }
       nullify_terminal_ping_locations: { Args: never; Returns: undefined }
+      request_more_places: {
+        Args: { p_ping_id: string }
+        Returns: {
+          confirmed_place_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          group_id: string
+          id: string
+          message: string
+          places_batch: number
+          proposed_time: string | null
+          status: string
+          vote_timer_minutes: number | null
+          voting_deadline: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       start_ping_voting: {
         Args: { p_ping_id: string }
         Returns: {
@@ -461,6 +490,7 @@ export type Database = {
           group_id: string
           id: string
           message: string
+          places_batch: number
           proposed_time: string | null
           status: string
           vote_timer_minutes: number | null

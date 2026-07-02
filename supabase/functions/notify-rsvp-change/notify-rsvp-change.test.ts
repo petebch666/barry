@@ -132,14 +132,14 @@ Deno.test('integration — 2km barycenter shift from leaver notifies remaining m
 
 // ─── Tests — Overpass query builder (mirrored from index.ts) ─────────────────
 
-function buildOverpassQuery(lat: number, lng: number, radiusM: number): string {
+function buildOverpassQuery(lat: number, lng: number, radiusM: number, limit = 15): string {
   return [
     '[out:json][timeout:10];',
     '(',
     `  node["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
     `  way["amenity"~"^(restaurant|bar)$"](around:${radiusM},${lat},${lng});`,
     ');',
-    'out body center;',
+    `out body center ${limit};`,
   ].join('\n');
 }
 

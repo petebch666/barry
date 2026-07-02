@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(19);
+SELECT plan(22);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -250,6 +250,50 @@ SELECT results_eq(
   $$ SELECT status FROM pings WHERE message = 'RLS-guarded ping' $$,
   ARRAY['open'],
   'RLS-guarded ping is still open after bob''s blocked attempt'
+);
+
+-- ─── Test: request_more_places RPC ("Find more places" feature) ───────
+INSERT INTO pings (id, group_id, created_by, message)
+SELECT gen_random_uuid(), g.id, tests.get_supabase_uid('alice'), 'Batch test ping'
+FROM groups g WHERE g.invite_code = 'TEST1234';
+
+SELECT tests.authenticate_as('alice');
+SELECT status FROM start_ping_voting((SELECT id FROM pings WHERE message = 'Batch test ping'));
+
+SELECT tests.authenticate_as('bob');
+INSERT INTO rsvps (ping_id, user_id, status)
+SELECT p.id, tests.get_supabase_uid('bob'), 'in'
+FROM pings p WHERE p.message = 'Batch test ping';
+
+-- An "in" member (not the creator/admin) can request more places — bumps places_batch 1 -> 2
+SELECT results_eq(
+  $$ SELECT places_batch FROM request_more_places(
+       (SELECT id FROM pings WHERE message = 'Batch test ping')
+     ) $$,
+  ARRAY[2],
+  'an "in" member (not creator/admin) can request more places'
+);
+
+-- Charlie never RSVP'd to this ping — cannot request more places
+SELECT tests.authenticate_as('charlie');
+SELECT throws_ok(
+  $$ SELECT * FROM request_more_places(
+       (SELECT id FROM pings WHERE message = 'Batch test ping')
+     ) $$,
+  'Only "in" members can request more places',
+  'a non-"in" member cannot request more places'
+);
+
+-- Cap at 3: bob bumps to 3, then a further attempt is a no-op
+SELECT tests.authenticate_as('bob');
+SELECT places_batch FROM request_more_places((SELECT id FROM pings WHERE message = 'Batch test ping'));
+
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM request_more_places(
+       (SELECT id FROM pings WHERE message = 'Batch test ping')
+     ) $$,
+  ARRAY[0],
+  'request_more_places is capped at 3 batches'
 );
 
 SELECT * FROM finish();

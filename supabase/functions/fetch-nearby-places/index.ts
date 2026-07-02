@@ -10,12 +10,26 @@
  *
  * The client subscribes to the places Realtime channel and renders cards as
  * they arrive — no polling required.
+ *
+ * Batches: pings.places_batch starts at 1 and is bumped by the
+ * request_more_places() RPC when the group wants another round of
+ * suggestions. Since this webhook fires on any UPDATE of pings (not just
+ * the initial 'open'→'voting' transition), this function tracks the
+ * highest places.batch already inserted for the ping and skips re-fetching
+ * unless places_batch has actually advanced past that — re-querying with a
+ * wider Overpass result limit and inserting only places not already present
+ * (deduped by external_id / proximity).
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
 
 const SEARCH_RADIUS_M = 400;
 const MAX_PLACES = 8;
-const MIRROR_TIMEOUT_MS = 8_000;
+// Buffer above MAX_PLACES since some raw elements get filtered out below
+// (missing name/coords) — but still capped well short of "every match",
+// which in dense areas can be 300+ elements Overpass has to compute and
+// serialize before returning anything.
+const OVERPASS_RESULT_LIMIT = 30;
+const MIRROR_TIMEOUT_MS = 20_000;
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -66,20 +80,32 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 Deno.serve(async (req) => {
   try {
     const { record } = await req.json();
-    const { id: pingId, status } = record as {
-      id: string; group_id: string; status: string;
+    const { id: pingId, status, places_batch: placesBatch } = record as {
+      id: string; group_id: string; status: string; places_batch: number;
     };
 
     if (status !== 'voting') return Response.json({ skipped: true });
 
     const supabase = createServiceClient();
 
-    // Idempotency guard: skip if places already exist for this ping
-    const { count } = await supabase
+    // Batch-aware idempotency guard: skip only if we've already fetched up
+    // to (or past) the ping's current places_batch — lets a places_batch
+    // bump re-trigger a fetch, while ignoring unrelated re-deliveries of
+    // this same webhook for the same batch.
+    const { data: existingPlaces } = await supabase
       .from('places')
-      .select('id', { count: 'exact', head: true })
+      .select('external_id, latitude, longitude, batch')
       .eq('ping_id', pingId);
-    if ((count ?? 0) > 0) return Response.json({ skipped: 'already_fetched' });
+
+    const maxExistingBatch = (existingPlaces ?? []).reduce((max, p) => Math.max(max, p.batch ?? 1), 0);
+    if (maxExistingBatch >= placesBatch) return Response.json({ skipped: 'already_fetched_this_batch' });
+
+    const existingExternalIds = new Set(
+      (existingPlaces ?? []).map((p: { external_id: string | null }) => p.external_id).filter(Boolean),
+    );
+    const existingPoints: LatLng[] = (existingPlaces ?? []).map(
+      (p: { latitude: number; longitude: number }) => ({ latitude: p.latitude, longitude: p.longitude }),
+    );
 
     const { data: rsvps } = await supabase
       .from('rsvps')
@@ -101,13 +127,17 @@ Deno.serve(async (req) => {
 
     // ── OpenStreetMap via Overpass API (free, no key required) ───────────
     try {
+      // Widen the result window per batch so there's a real pool of
+      // not-yet-seen elements to dedup against (Overpass returns nearest-
+      // first, so batch 2 needs to look further out than batch 1 did).
+      const overpassLimit = OVERPASS_RESULT_LIMIT * placesBatch;
       const query = [
         '[out:json][timeout:25];',
         '(',
         `  node["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
         `  way["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${barycenter.latitude},${barycenter.longitude});`,
         ');',
-        'out body center;',
+        `out body center ${overpassLimit};`,
       ].join('\n');
 
       const body = `data=${encodeURIComponent(query)}`;
@@ -131,11 +161,17 @@ Deno.serve(async (req) => {
         const { elements = [] } = await res.json() as { elements: OsmElement[] };
         console.log(`Overpass returned ${elements.length} elements near ${barycenter.latitude},${barycenter.longitude}`);
 
-        for (const element of elements.slice(0, MAX_PLACES)) {
+        let newOsmCount = 0;
+        for (const element of elements) {
+          if (newOsmCount >= MAX_PLACES) break;
+
           const lat = element.type === 'node' ? element.lat : element.center?.lat;
           const lon = element.type === 'node' ? element.lon : element.center?.lon;
           const tags = element.tags ?? {};
           if (!lat || !lon || !tags.name) continue;
+
+          const extId = `${element.type}/${element.id}`;
+          if (existingExternalIds.has(extId)) continue;
 
           const addrParts: string[] = [];
           if (tags['addr:housenumber'] && tags['addr:street']) {
@@ -153,11 +189,13 @@ Deno.serve(async (req) => {
             longitude: lon,
             category: tags.amenity ?? null,
             source: 'osm',
-            external_id: `${element.type}/${element.id}`,
+            external_id: extId,
             photo_url: null,
             rating: null,
             suggested_by: null,
+            batch: placesBatch,
           });
+          newOsmCount++;
         }
       }
     } catch (overpassErr) {
@@ -177,11 +215,12 @@ Deno.serve(async (req) => {
         const dist = haversineMeters(barycenter, { latitude: sp.latitude, longitude: sp.longitude });
         if (dist > SEARCH_RADIUS_M * 2) continue;
 
-        const alreadyIn = placesToInsert.some((p) =>
-          haversineMeters(
-            { latitude: p.latitude as number, longitude: p.longitude as number },
-            { latitude: sp.latitude, longitude: sp.longitude },
-          ) < 50,
+        const nearbyPoints = [
+          ...placesToInsert.map((p) => ({ latitude: p.latitude as number, longitude: p.longitude as number })),
+          ...existingPoints,
+        ];
+        const alreadyIn = nearbyPoints.some(
+          (p) => haversineMeters(p, { latitude: sp.latitude, longitude: sp.longitude }) < 50,
         );
         if (!alreadyIn) {
           placesToInsert.push({
@@ -196,6 +235,7 @@ Deno.serve(async (req) => {
             photo_url: null,
             rating: null,
             suggested_by: sp.user_id,
+            batch: placesBatch,
           });
         }
       }

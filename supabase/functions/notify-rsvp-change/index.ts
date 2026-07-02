@@ -12,8 +12,9 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 const SHIFT_THRESHOLD_M = 1_000;
 const SEARCH_RADIUS_M = 800;
 const MAX_NEW_PLACES = 4;
+const OVERPASS_RESULT_LIMIT = 15;
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const OVERPASS_TIMEOUT_MS = 8_000;
+const OVERPASS_TIMEOUT_MS = 20_000;
 
 // Bounds the Overpass call so a slow/rate-limited response can't eat the
 // function's whole wall-clock budget — see the same guard in
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
           `  node["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
           `  way["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
           ');',
-          'out body center;',
+          `out body center ${OVERPASS_RESULT_LIMIT};`,
         ].join('\n');
 
         const res = await fetchWithTimeout(OVERPASS_URL, {

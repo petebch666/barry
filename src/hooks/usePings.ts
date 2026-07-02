@@ -158,3 +158,23 @@ export function useStartVoting() {
     },
   });
 }
+
+/**
+ * Bumps pings.places_batch, which re-triggers the existing
+ * fetch-nearby-places webhook (it fires on any pings UPDATE) to fetch
+ * another round of suggestions. Capped server-side at 3 batches; the RPC
+ * returns no row once the cap is reached or the caller isn't an "in" member.
+ */
+export function useRequestMorePlaces() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pingId: string) => {
+      const { error } = await supabase.rpc('request_more_places', { p_ping_id: pingId });
+      if (error) throw error;
+    },
+    onSuccess: (_data, pingId) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, pingId] });
+    },
+  });
+}
