@@ -333,3 +333,29 @@ Deno.test('dedupeNewOsmResults — skips elements without a name/coords', () => 
   const kept = dedupeNewOsmResults(elements, new Set(), 8);
   assertEquals(kept, ['node/2']);
 });
+
+// ─── Retry-on-transient-failure logic ──────────────────────────────────────────
+
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+function isRetryableStatus(status: number): boolean {
+  return RETRYABLE_STATUSES.has(status);
+}
+
+Deno.test('isRetryableStatus — 429/502/503/504 are retried', () => {
+  assertEquals(isRetryableStatus(429), true);
+  assertEquals(isRetryableStatus(502), true);
+  assertEquals(isRetryableStatus(503), true);
+  assertEquals(isRetryableStatus(504), true);
+});
+
+Deno.test('isRetryableStatus — other 4xx/5xx are not retried', () => {
+  assertEquals(isRetryableStatus(400), false);
+  assertEquals(isRetryableStatus(403), false);
+  assertEquals(isRetryableStatus(404), false);
+  assertEquals(isRetryableStatus(500), false);
+});
+
+Deno.test('isRetryableStatus — 200 is not retried', () => {
+  assertEquals(isRetryableStatus(200), false);
+});

@@ -14,7 +14,9 @@ const SEARCH_RADIUS_M = 800;
 const MAX_NEW_PLACES = 4;
 const OVERPASS_RESULT_LIMIT = 15;
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const OVERPASS_TIMEOUT_MS = 20_000;
+const OVERPASS_TIMEOUT_MS = 15_000;
+const RETRY_BACKOFF_MS = 1_500;
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
 // Bounds the Overpass call so a slow/rate-limited response can't eat the
 // function's whole wall-clock budget — see the same guard in
@@ -27,6 +29,21 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   } finally {
     clearTimeout(timer);
   }
+}
+
+// One retry after a short backoff for transient failures (timeout/network
+// error, or a 429/502/503/504) — see fetch-nearby-places/index.ts for the
+// same pattern and the production incident that motivated it.
+async function fetchOverpassWithRetry(url: string, options: RequestInit): Promise<Response> {
+  try {
+    const res = await fetchWithTimeout(url, options, OVERPASS_TIMEOUT_MS);
+    if (res.ok || !RETRYABLE_STATUSES.has(res.status)) return res;
+    console.warn(`Overpass mirror ${url} returned ${res.status}, retrying once`);
+  } catch (err) {
+    console.warn(`Overpass mirror ${url} failed or timed out, retrying once:`, err);
+  }
+  await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+  return await fetchWithTimeout(url, options, OVERPASS_TIMEOUT_MS);
 }
 
 interface LatLng { latitude: number; longitude: number; }
@@ -160,14 +177,14 @@ Deno.serve(async (req) => {
           `out body center ${OVERPASS_RESULT_LIMIT};`,
         ].join('\n');
 
-        const res = await fetchWithTimeout(OVERPASS_URL, {
+        const res = await fetchOverpassWithRetry(OVERPASS_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'BarryApp/1.0',
           },
           body: `data=${encodeURIComponent(query)}`,
-        }, OVERPASS_TIMEOUT_MS);
+        });
 
         if (res.ok) {
           const { elements = [] } = await res.json() as { elements: OsmElement[] };

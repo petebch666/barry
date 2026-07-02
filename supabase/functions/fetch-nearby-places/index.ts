@@ -29,7 +29,9 @@ const MAX_PLACES = 8;
 // which in dense areas can be 300+ elements Overpass has to compute and
 // serialize before returning anything.
 const OVERPASS_RESULT_LIMIT = 30;
-const MIRROR_TIMEOUT_MS = 20_000;
+const MIRROR_TIMEOUT_MS = 15_000;
+const RETRY_BACKOFF_MS = 1_500;
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -49,6 +51,22 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   } finally {
     clearTimeout(timer);
   }
+}
+
+// One retry per mirror after a short backoff, for transient failures only
+// (timeout/network error, or a 429/502/503/504 — these commonly clear up a
+// couple seconds later on Overpass's shared public instances). Worst case
+// per mirror: MIRROR_TIMEOUT_MS*2 + RETRY_BACKOFF_MS.
+async function fetchOverpassMirror(url: string, options: RequestInit): Promise<Response> {
+  try {
+    const res = await fetchWithTimeout(url, options, MIRROR_TIMEOUT_MS);
+    if (res.ok || !RETRYABLE_STATUSES.has(res.status)) return res;
+    console.warn(`Overpass mirror ${url} returned ${res.status}, retrying once`);
+  } catch (err) {
+    console.warn(`Overpass mirror ${url} failed or timed out, retrying once:`, err);
+  }
+  await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+  return await fetchWithTimeout(url, options, MIRROR_TIMEOUT_MS);
 }
 
 interface LatLng { latitude: number; longitude: number; }
@@ -149,11 +167,11 @@ Deno.serve(async (req) => {
       let res: Response | null = null;
       for (const mirror of OVERPASS_MIRRORS) {
         try {
-          res = await fetchWithTimeout(mirror, { method: 'POST', headers: fetchHeaders, body }, MIRROR_TIMEOUT_MS);
+          res = await fetchOverpassMirror(mirror, { method: 'POST', headers: fetchHeaders, body });
           if (res.ok) break;
-          console.warn(`Overpass mirror ${mirror} returned ${res.status}`);
+          console.warn(`Overpass mirror ${mirror} returned ${res.status} (after retry)`);
         } catch (mirrorErr) {
-          console.warn(`Overpass mirror ${mirror} failed or timed out:`, mirrorErr);
+          console.warn(`Overpass mirror ${mirror} failed or timed out (after retry):`, mirrorErr);
         }
       }
 
