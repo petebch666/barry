@@ -11,13 +11,13 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 1. **Ping** — send a ping to one of your groups with a message, an optional proposed time, and an optional **vote timer** (15m/30m/1h/2h)
 2. **RSVP** — members respond in/out/maybe; "in" members can optionally share their current location
 3. **Barycenter** — the app computes the arithmetic mean of all "in" members' locations
-4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list. If the first 8 don't satisfy the group, any "in" member can tap **"Find more places"** for another round (up to 3 rounds total)
+4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list. Each Overpass mirror gets one retry after a short backoff on a transient failure (timeout, 429/502/503/504) before falling through to the next, since the free public mirrors occasionally get overloaded. If the first 8 don't satisfy the group, any "in" member can tap **"Find more places"** for another round (up to 3 rounds total)
 5. **Vote** — members vote for their preferred venue; any member can also suggest an additional place
 6. **Confirm** —
    - **No vote timer set:** as soon as >50% of "in" members vote for the same venue, the meetup is confirmed.
    - **Vote timer set:** the majority short-circuit is suppressed so a couple of early voters can't lock out the rest of the group — the meetup only confirms early if *every* "in" member has voted, otherwise it waits for the timer to expire and the plurality leader (tie-broken by barycenter distance) wins.
 
-   Either way, everyone gets a push notification once a venue is confirmed.
+   Either way, everyone gets a push notification once a venue is confirmed. The home feed updates live (Realtime, no manual refresh needed) — a confirmed ping shows as a distinct tile with the venue, time, and a "Get Directions" button right there in the list. The ping detail screen also gets a "Done — back to home" shortcut once confirmed.
 7. **Cancel or leave** — the ping creator can cancel at any time (all RSVP'd members are notified); any "in" member can leave (if their departure shifts the barycenter by more than 1 km, remaining members are notified and new places are suggested)
 
 ---
@@ -177,10 +177,20 @@ The optional per-ping vote timer relies on `finalize-ping-vote`, which is invoke
 
 ## Development
 
-### Web preview (UI only — no maps, location, or push)
+### Web preview
 
-Useful for quickly iterating on screens that don't require native APIs.
+Useful for quickly iterating without a native build. Maps and location
+sharing work on web too (Leaflet in an iframe, browser geolocation) — the
+one thing that doesn't work is push notifications. "Get Directions" opens
+openstreetmap.org on web instead of a native maps app, since the
+`geo:`/`maps:` URI schemes used on Android/iOS have no browser handler.
 
+```bash
+npm start
+# opens a web tab automatically, or press "w" in the terminal
+```
+
+For a static export instead:
 ```bash
 npx expo export --platform web
 npx serve dist

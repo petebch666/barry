@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CreatePingSchema, type Ping, type CreatePing } from '@/schemas';
+import { CreatePingSchema, type Ping, type Place, type CreatePing } from '@/schemas';
 
 const QUERY_KEY = 'pings';
+
+type FeedPlace = Pick<Place, 'id' | 'name' | 'address' | 'latitude' | 'longitude'>;
 
 /** All active pings across the current user's groups, for the Feed screen. */
 export function useFeedPings() {
@@ -16,15 +18,36 @@ export function useFeedPings() {
           *,
           groups(id, name),
           profiles!pings_created_by_fkey(id, display_name, avatar_url),
-          rsvps(id, user_id, status)
+          rsvps(id, user_id, status),
+          places!pings_confirmed_place_id_fkey(id, name, address, latitude, longitude)
         `)
         .in('status', ['open', 'voting', 'confirmed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as (Ping & { groups: { id: string; name: string } })[];
+      return data as (Ping & { groups: { id: string; name: string }; places: FeedPlace | null })[];
     },
   });
+}
+
+/** Subscribes to real-time changes across all pings, for the Feed screen. */
+export function useFeedPingsRealtime() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('feed-pings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pings' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'feed'] });
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 }
 
 /** Pings for a specific group. */

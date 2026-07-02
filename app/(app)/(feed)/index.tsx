@@ -8,17 +8,24 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFeedPings } from '@/hooks/usePings';
+import { useFeedPings, useFeedPingsRealtime } from '@/hooks/usePings';
 import { useGroups } from '@/hooks/useGroups';
 import { GlassCard } from '@/components/GlassCard';
 import { Badge } from '@/components/Badge';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
-import type { Ping } from '@/schemas';
+import { openDirections } from '@/utils/openDirections';
+import type { Ping, Place } from '@/schemas';
+
+type FeedPing = Ping & {
+  groups?: { name: string };
+  places?: Pick<Place, 'id' | 'name' | 'address' | 'latitude' | 'longitude'> | null;
+};
 
 export default function FeedScreen() {
   const router = useRouter();
   const { data: pings, isLoading, refetch, isRefetching } = useFeedPings();
   const { data: groups, isLoading: groupsLoading } = useGroups();
+  useFeedPingsRealtime();
 
   const hasGroups = (groups?.length ?? 0) > 0;
   const initialized = !isLoading && !groupsLoading;
@@ -82,33 +89,62 @@ export default function FeedScreen() {
 
 // ─── Ping card ────────────────────────────────────────────────────────────────
 
-function PingCard({ ping }: { ping: Ping & { groups?: { name: string } } }) {
+function PingCard({ ping }: { ping: FeedPing }) {
   const router = useRouter();
+  const confirmedPlace = ping.status === 'confirmed' ? ping.places : null;
 
   return (
-    <TouchableOpacity
-      onPress={() => router.push(`/(app)/(feed)/ping/${ping.id}`)}
-      accessibilityRole="button"
-      accessibilityLabel={`Ping: ${ping.message}`}
-      activeOpacity={0.75}
-    >
-      <GlassCard style={styles.card}>
+    <GlassCard style={[styles.card, confirmedPlace && styles.cardConfirmed]}>
+      <TouchableOpacity
+        onPress={() => router.push(`/(app)/(feed)/ping/${ping.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`Ping: ${ping.message}`}
+        activeOpacity={0.75}
+      >
         <View style={styles.cardTop}>
           <Text style={styles.groupName} numberOfLines={1}>
-            {(ping as any).groups?.name ?? 'Group'}
+            {ping.groups?.name ?? 'Group'}
           </Text>
           <Badge status={ping.status} />
         </View>
         <Text style={styles.message} numberOfLines={2}>{ping.message}</Text>
-        {ping.proposed_time && (
-          <Text style={styles.time}>
-            {new Date(ping.proposed_time).toLocaleString(undefined, {
-              weekday: 'short', hour: '2-digit', minute: '2-digit',
-            })}
-          </Text>
+
+        {confirmedPlace ? (
+          <>
+            <Text style={styles.confirmedPlaceName} numberOfLines={1}>{confirmedPlace.name}</Text>
+            {confirmedPlace.address && (
+              <Text style={styles.confirmedPlaceAddress} numberOfLines={1}>{confirmedPlace.address}</Text>
+            )}
+            {ping.proposed_time && (
+              <Text style={styles.time}>
+                {new Date(ping.proposed_time).toLocaleString(undefined, {
+                  weekday: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </Text>
+            )}
+          </>
+        ) : (
+          ping.proposed_time && (
+            <Text style={styles.time}>
+              {new Date(ping.proposed_time).toLocaleString(undefined, {
+                weekday: 'short', hour: '2-digit', minute: '2-digit',
+              })}
+            </Text>
+          )
         )}
-      </GlassCard>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      {confirmedPlace && (
+        <TouchableOpacity
+          style={styles.directionsBtn}
+          onPress={() => openDirections(confirmedPlace.latitude, confirmedPlace.longitude, confirmedPlace.name)}
+          accessibilityRole="button"
+          accessibilityLabel={`Get directions to ${confirmedPlace.name}`}
+        >
+          <Text style={styles.directionsBtnText}>Get directions →</Text>
+        </TouchableOpacity>
+      )}
+    </GlassCard>
   );
 }
 
@@ -164,10 +200,21 @@ const styles = StyleSheet.create({
 
   // ── Ping cards ────────────────────────────────────────────────────────────
   card: { padding: 16, gap: 8 },
+  cardConfirmed: { borderColor: colors.success, backgroundColor: colors.success + '14' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   groupName: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   message: { fontSize: 17, fontWeight: '600', color: colors.text, lineHeight: 22 },
   time: { fontSize: 13, color: colors.textTertiary },
+  confirmedPlaceName: { fontSize: 15, fontWeight: '700', color: colors.success, marginTop: 2 },
+  confirmedPlaceAddress: { fontSize: 13, color: colors.textSecondary },
+  directionsBtn: {
+    marginTop: 4,
+    backgroundColor: colors.success + '28',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  directionsBtnText: { fontSize: 14, fontWeight: '600', color: colors.success },
 
   // ── Empty state ───────────────────────────────────────────────────────────
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },

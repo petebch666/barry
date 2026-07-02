@@ -272,6 +272,14 @@ export default function PingDetailScreen() {
                   )}
                 </TouchableOpacity>
               )}
+
+              {isConfirmed && (
+                <GlassButton
+                  label="Done — back to home"
+                  onPress={() => router.replace('/(app)/(feed)')}
+                  accessibilityLabel="Done, back to home"
+                />
+              )}
             </View>
           )}
 

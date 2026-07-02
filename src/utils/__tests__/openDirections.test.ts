@@ -21,8 +21,13 @@ describe('buildDirectionsUrl', () => {
       .toBe('geo:-33.8688,151.2093?q=Opera%20Bar');
   });
 
-  test('web / unknown platform falls back to geo: scheme', () => {
+  test('web: openstreetmap.org URL (geo:/maps: schemes have no browser handler)', () => {
     expect(buildDirectionsUrl(48.8, 2.35, 'Spot', 'web'))
+      .toBe('https://www.openstreetmap.org/?mlat=48.8&mlon=2.35#map=17/48.8/2.35');
+  });
+
+  test('unknown platform falls back to geo: scheme', () => {
+    expect(buildDirectionsUrl(48.8, 2.35, 'Spot', 'windows'))
       .toBe('geo:48.8,2.35?q=Spot');
   });
 });
