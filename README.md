@@ -38,7 +38,7 @@ Send a **ping** to a group of friends ("anyone for a drink tonight?"), let every
 | Data fetching | TanStack React Query v5 |
 | Validation | Zod v4 |
 | Testing | Jest 29 + React Native Testing Library + pgTAP + Deno test |
-| Build | EAS Build (cloud — required for Windows dev) |
+| Build | EAS Build (cloud; iOS builds need it until full Xcode is installed locally) |
 
 ---
 
@@ -224,7 +224,7 @@ To skip email confirmation during development: Supabase Dashboard → **Authenti
 
 ## Building
 
-### Android dev build (sideload APK — works on Windows without local SDK)
+### Android dev build (sideload APK — no local Android SDK needed)
 
 ```bash
 eas build --platform android --profile development
