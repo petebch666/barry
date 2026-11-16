@@ -4,9 +4,9 @@
 
 ## Repository layout
 
-The git root and Expo project root are both `C:\dev\barry`.
+The git root and Expo project root are both the repo root (`~/Documents/Coding/barry` on the current macOS dev machine).
 
-- Run **all commands** (npm / expo / jest / git / supabase) from `C:\dev\barry`
+- Run **all commands** (npm / expo / jest / git / supabase) from the repo root
 
 ## Essential commands
 
@@ -107,6 +107,6 @@ Tests live in:
 - **EAS project ID is required for push tokens** — `getExpoPushTokenAsync` silently returns null without it. Run `eas build:configure` first.
 - **`npx supabase init` exit code 1** — this is a PostHog analytics timeout, not an actual failure. Check that `supabase/config.toml` was created; if it was, proceed normally.
 - **Apple Sign In only works on a physical device** — cannot be tested in simulator.
-- **Windows + iOS** — no local Xcode. All iOS builds go through EAS. Register device UDID in Apple Developer portal before requesting a dev build.
+- **macOS + iOS** — only the Xcode Command Line Tools are installed (no full Xcode.app), so iOS builds still go through EAS. Installing Xcode would enable local builds (`npx expo run:ios`) and the iOS Simulator. For EAS dev builds on a physical device, register the device UDID in the Apple Developer portal first.
 - **pg_cron availability** — the triggers migration registers cron jobs conditionally (`IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')`). Enable pg_cron in the Supabase Dashboard under Database → Extensions before running migrations in production.
 - **pg_net + Vault for cron-triggered Edge Functions** — `011_finalize_vote_cron.sql` calls `finalize-ping-vote` on a schedule via `net.http_post`. This needs the `pg_net` extension enabled (Database → Extensions) and the project URL + service-role key stored as Vault secrets (`project_url`, `service_role_key`) via the SQL editor — migrations can't create these secrets themselves.
