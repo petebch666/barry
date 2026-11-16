@@ -73,6 +73,7 @@ export function useSavePlace() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'saved-places'] });
+      queryClient.invalidateQueries({ queryKey: ['favorite-places'] });
     },
   });
 }
@@ -95,6 +96,7 @@ export function useDeleteSavedPlace() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, 'saved-places'] });
+      queryClient.invalidateQueries({ queryKey: ['favorite-places'] });
     },
   });
 }

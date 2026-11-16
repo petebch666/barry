@@ -11,21 +11,29 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useSavePlace } from '@/hooks/useProfile';
-import { AddSavedPlaceSchema } from '@/schemas';
+import { useFavoritePlaces, useUpdateSavedPlace } from '@/hooks/useFavoritePlaces';
+import { AddSavedPlaceSchema, UpdateSavedPlaceSchema } from '@/schemas';
 import { reverseGeocode } from '@/utils/reverseGeocode';
+import type { AddressSuggestion } from '@/utils/searchAddress';
 import { colors, radii } from '@/lib/theme';
 import PinMapPicker from '@/components/PinMapPicker';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 
 const PARIS = { latitude: 48.8566, longitude: 2.3522 };
 const CATEGORY_CHIPS = ['bar', 'restaurant', 'café', 'parc', 'autre'];
 
 export default function AddSavedPlaceScreen() {
   const router = useRouter();
-  const { mutateAsync: savePlace, isPending } = useSavePlace();
+  const { placeId } = useLocalSearchParams<{ placeId?: string }>();
+  const isEditing = !!placeId;
+  const { mutateAsync: savePlace, isPending: isSaving } = useSavePlace();
+  const { mutateAsync: updatePlace, isPending: isUpdating } = useUpdateSavedPlace();
+  const { data: favoritePlaces } = useFavoritePlaces();
+  const isPending = isSaving || isUpdating;
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -35,13 +43,24 @@ export default function AddSavedPlaceScreen() {
   const [locationReady, setLocationReady] = useState(Platform.OS === 'web');
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
   const addressEditedByUser = useRef(false);
+  const prefilled = useRef(false);
 
-  // Web-only manual coordinate inputs
-  const [latText, setLatText] = useState('');
-  const [lngText, setLngText] = useState('');
+  // Prefill from the existing place when editing. Location isn't editable
+  // (UpdateSavedPlaceSchema only covers name/address/category), so the
+  // location-picking UI is hidden entirely in edit mode instead.
+  useEffect(() => {
+    if (!isEditing || prefilled.current || !favoritePlaces) return;
+    const existing = favoritePlaces.find((p) => p.id === placeId);
+    if (!existing) return;
+    setName(existing.name);
+    setAddress(existing.address ?? '');
+    setCategory(existing.category ?? '');
+    addressEditedByUser.current = true;
+    prefilled.current = true;
+  }, [isEditing, placeId, favoritePlaces]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isEditing) return;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -57,7 +76,7 @@ export default function AddSavedPlaceScreen() {
         setLocationReady(true);
       }
     })();
-  }, []);
+  }, [isEditing]);
 
   async function handleLocationChange(loc: { latitude: number; longitude: number }) {
     setLocation(loc);
@@ -73,15 +92,39 @@ export default function AddSavedPlaceScreen() {
     }
   }
 
+  function handleAddressSelect(s: AddressSuggestion) {
+    setAddress(s.label);
+    setLocation({ latitude: s.latitude, longitude: s.longitude });
+    // Deliberately leave addressEditedByUser false — a later pin drag
+    // should still re-run reverseGeocode and auto-fill the address, same
+    // as the GPS-then-drag flow already does.
+  }
+
   async function submit() {
-    const lat = Platform.OS === 'web' ? parseFloat(latText) : location.latitude;
-    const lng = Platform.OS === 'web' ? parseFloat(lngText) : location.longitude;
+    if (isEditing) {
+      const parsed = UpdateSavedPlaceSchema.safeParse({
+        name: name.trim(),
+        address: address.trim() || null,
+        category: category.trim() || null,
+      });
+      if (!parsed.success) {
+        Alert.alert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
+        return;
+      }
+      try {
+        await updatePlace({ placeId: placeId!, updates: parsed.data });
+        router.back();
+      } catch (err) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Could not update place.');
+      }
+      return;
+    }
 
     const parsed = AddSavedPlaceSchema.safeParse({
       name: name.trim(),
       address: address.trim() || undefined,
-      latitude: lat,
-      longitude: lng,
+      latitude: location.latitude,
+      longitude: location.longitude,
       category: category.trim() || undefined,
     });
 
@@ -91,16 +134,19 @@ export default function AddSavedPlaceScreen() {
     }
 
     try {
-      await savePlace({ ...parsed.data, osm_id: null });
+      await savePlace({
+        ...parsed.data,
+        address: parsed.data.address ?? null,
+        category: parsed.data.category ?? null,
+        osm_id: null,
+      });
       router.back();
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not save place.');
     }
   }
 
-  const canSubmit =
-    !!name.trim() &&
-    (Platform.OS !== 'web' || (latText.trim() !== '' && lngText.trim() !== ''));
+  const canSubmit = !!name.trim();
 
   return (
     <KeyboardAvoidingView
@@ -116,7 +162,7 @@ export default function AddSavedPlaceScreen() {
           >
             <Text style={styles.cancel}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Add Place</Text>
+          <Text style={styles.title}>{isEditing ? 'Edit Place' : 'Add Place'}</Text>
           <TouchableOpacity
             onPress={submit}
             disabled={isPending || !canSubmit}
@@ -173,37 +219,40 @@ export default function AddSavedPlaceScreen() {
             accessibilityLabel="Category"
           />
 
-          {Platform.OS === 'web' ? (
-            <View style={styles.coordRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Latitude *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={latText}
-                  onChangeText={setLatText}
-                  placeholder="48.8566"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="decimal-pad"
-                  accessibilityLabel="Latitude"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Longitude *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={lngText}
-                  onChangeText={setLngText}
-                  placeholder="2.3522"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="decimal-pad"
-                  accessibilityLabel="Longitude"
-                />
-              </View>
-            </View>
+          <View style={styles.addressLabelRow}>
+            <Text style={styles.label}>Address</Text>
+            {isGeocodingAddress && (
+              <ActivityIndicator size="small" color={colors.textTertiary} />
+            )}
+          </View>
+          {isEditing ? (
+            <TextInput
+              style={styles.input}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Address"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={500}
+              accessibilityLabel="Address"
+            />
+          ) : (
+            <AddressAutocomplete
+              value={address}
+              onChangeText={(t) => {
+                addressEditedByUser.current = true;
+                setAddress(t);
+              }}
+              onSelect={handleAddressSelect}
+              placeholder="Search for an address…"
+            />
+          )}
+
+          {isEditing ? (
+            <Text style={styles.hint}>Location can't be changed after saving — remove and re-add the place if it moved.</Text>
           ) : (
             <>
-              <Text style={styles.label}>Location *</Text>
-              <Text style={styles.hint}>Drag the pin to mark the exact spot.</Text>
+              <Text style={styles.label}>Location</Text>
+              <Text style={styles.hint}>Search for an address above, or drag the pin to fine-tune.</Text>
               {locationReady ? (
                 <PinMapPicker
                   initialLocation={location}
@@ -216,25 +265,6 @@ export default function AddSavedPlaceScreen() {
               )}
             </>
           )}
-
-          <View style={styles.addressLabelRow}>
-            <Text style={styles.label}>Address</Text>
-            {isGeocodingAddress && (
-              <ActivityIndicator size="small" color={colors.textTertiary} />
-            )}
-          </View>
-          <TextInput
-            style={styles.input}
-            value={address}
-            onChangeText={(t) => {
-              addressEditedByUser.current = true;
-              setAddress(t);
-            }}
-            placeholder="Auto-filled when you drop a pin"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={500}
-            accessibilityLabel="Address"
-          />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -297,7 +327,6 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
   chipTextActive: { color: colors.accent, fontWeight: '600' },
-  coordRow: { flexDirection: 'row', gap: 12 },
   mapPlaceholder: {
     height: 240,
     borderRadius: radii.sm,

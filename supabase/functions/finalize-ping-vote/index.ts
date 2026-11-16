@@ -5,11 +5,11 @@
  * Sweeps pings whose vote timer has expired and finalizes them: the
  * plurality leader wins (tie-break via barycenter), no >50% majority
  * required — the timer's whole purpose is to force a decision once time is
- * up. Pings with zero votes are left in 'voting' rather than auto-cancelled;
- * out of scope for this feature.
+ * up. Pings with zero votes are cancelled; otherwise they would sit in
+ * 'voting' until expires_at (up to 8 hours) with nothing left to decide.
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
-import { computeBarycenter, confirmWinner, pickWinner, type LatLng } from '../_shared/vote-decision.ts';
+import { cancelUnvotedPing, computeBarycenter, confirmWinner, pickWinner, type LatLng } from '../_shared/vote-decision.ts';
 
 Deno.serve(async (_req) => {
   try {
@@ -40,7 +40,8 @@ Deno.serve(async (_req) => {
         .eq('ping_id', pingId);
 
       if (!votes?.length) {
-        results[pingId] = 'skipped_no_votes';
+        const { cancelled } = await cancelUnvotedPing(supabase, pingId);
+        results[pingId] = cancelled ? 'cancelled_no_votes' : 'already_resolved';
         continue;
       }
 

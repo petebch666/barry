@@ -180,6 +180,48 @@ export type Database = {
           },
         ]
       }
+      place_ratings: {
+        Row: {
+          created_at: string
+          id: string
+          place_id: string
+          rating: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          place_id: string
+          rating: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          place_id?: string
+          rating?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_ratings_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "saved_places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_ratings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       places: {
         Row: {
           address: string | null
@@ -480,6 +522,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      shares_group_with: { Args: { other_user_id: string }; Returns: boolean }
       start_ping_voting: {
         Args: { p_ping_id: string }
         Returns: {

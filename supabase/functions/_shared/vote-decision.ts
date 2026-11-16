@@ -69,6 +69,32 @@ export function pickWinner(
 }
 
 /**
+ * Cancels a ping whose vote timer ran out with no votes at all, mirroring
+ * what cancel_expired_pings() (003_triggers.sql) does at expires_at. The
+ * status change fires the notify-ping-cancelled webhook and lets the
+ * location-nullification cron clear RSVP coordinates, so nothing else is
+ * needed here.
+ *
+ * Same `WHERE status = 'voting'` guard as confirmWinner: if a late vote made
+ * check-vote-majority confirm first, this matches zero rows and is a no-op.
+ */
+export async function cancelUnvotedPing(
+  // deno-lint-ignore no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  pingId: string,
+): Promise<{ cancelled: boolean }> {
+  const { data: updated, error } = await supabase
+    .from('pings')
+    .update({ status: 'cancelled' })
+    .eq('id', pingId)
+    .eq('status', 'voting')
+    .select('id');
+
+  if (error) throw error;
+  return { cancelled: !!updated?.length };
+}
+
+/**
  * Confirms a ping's winning place and notifies "in" members.
  *
  * Race safety: this UPDATE is guarded by `WHERE status = 'voting'`. Two
