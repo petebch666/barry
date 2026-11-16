@@ -17,7 +17,7 @@ Beyond meetups, Barry is also about **recommending your favorite places to your 
 5. **Vote** — members vote for their preferred venue; any member can also suggest an additional place
 6. **Confirm** —
    - **No vote timer set:** as soon as >50% of "in" members vote for the same venue, the meetup is confirmed.
-   - **Vote timer set:** the majority short-circuit is suppressed so a couple of early voters can't lock out the rest of the group — the meetup only confirms early if *every* "in" member has voted, otherwise it waits for the timer to expire and the plurality leader (tie-broken by barycenter distance) wins.
+   - **Vote timer set:** the majority short-circuit is suppressed so a couple of early voters can't lock out the rest of the group — the meetup only confirms early if *every* "in" member has voted, otherwise it waits for the timer to expire and the plurality leader (tie-broken by barycenter distance) wins. If nobody voted by then, the ping is cancelled and members are notified.
 
    Either way, everyone gets a push notification once a venue is confirmed. The home feed updates live (Realtime, no manual refresh needed) — a confirmed ping shows as a distinct tile with the venue, time, and a "Get Directions" button right there in the list. The ping detail screen also gets a "Done — back to home" shortcut once confirmed.
 7. **Cancel or leave** — the ping creator can cancel at any time (all RSVP'd members are notified); any "in" member can leave (if their departure shifts the barycenter by more than 1 km, remaining members are notified and new places are suggested)
