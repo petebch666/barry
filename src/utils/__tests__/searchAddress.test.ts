@@ -4,16 +4,16 @@ describe('searchAddress', () => {
   afterEach(() => { jest.resetAllMocks(); });
 
   it('returns [] for a query under 3 characters without calling fetch', async () => {
-    global.fetch = jest.fn() as jest.Mock;
+    globalThis.fetch = jest.fn() as jest.Mock;
 
     const result = await searchAddress('ab');
 
     expect(result).toEqual([]);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('parses a BAN response and flips [lon, lat] to {latitude, longitude}', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
+    globalThis.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         features: [
@@ -30,25 +30,25 @@ describe('searchAddress', () => {
     expect(result).toEqual([
       { label: '12 Rue de Rivoli 75001 Paris', latitude: 48.8566, longitude: 2.3522 },
     ]);
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('https://api-adresse.data.gouv.fr/search/?q='),
     );
   });
 
   it('returns [] on HTTP error', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({ ok: false }) as jest.Mock;
+    globalThis.fetch = jest.fn().mockResolvedValueOnce({ ok: false }) as jest.Mock;
 
     expect(await searchAddress('rue de rivoli')).toEqual([]);
   });
 
   it('returns [] on network failure', async () => {
-    global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error')) as jest.Mock;
+    globalThis.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error')) as jest.Mock;
 
     expect(await searchAddress('rue de rivoli')).toEqual([]);
   });
 
   it('filters out malformed features (missing label or coordinates)', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
+    globalThis.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         features: [
@@ -67,7 +67,7 @@ describe('searchAddress', () => {
   });
 
   it('returns [] when features is missing entirely', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
+    globalThis.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({}),
     }) as jest.Mock;

@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(30);
+SELECT plan(33);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -297,10 +297,18 @@ SELECT results_eq(
 );
 
 -- ─── Test: saved_places sharing + place_ratings (Places tab feature) ──
--- Alice and Bob already share "Test Group" (seeded at the top); Charlie
--- shares no group with either.
+-- Alice and Bob share "Test Group" (seeded at the top). Charlie joined it
+-- via the invite test above, so the outsider here is Dave, who is in no group.
+SELECT tests.create_supabase_user('dave', 'dave@test.com');
+SELECT tests.clear_authentication();
+INSERT INTO profiles (id, display_name)
+VALUES (tests.get_supabase_uid('dave'), 'Dave')
+ON CONFLICT DO NOTHING;
+
 INSERT INTO saved_places (id, user_id, name, latitude, longitude)
-VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('alice'), 'Le Comptoir', 48.8566, 2.3522);
+VALUES
+  ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('alice'), 'Le Comptoir', 48.8566, 2.3522),
+  ('22222222-2222-2222-2222-222222222222', tests.get_supabase_uid('dave'),  'Chez Dave',   48.8600, 2.3400);
 
 SELECT tests.authenticate_as('bob');
 SELECT results_eq(
@@ -309,7 +317,7 @@ SELECT results_eq(
   'group member can read a shared-group place'
 );
 
-SELECT tests.authenticate_as('charlie');
+SELECT tests.authenticate_as('dave');
 SELECT results_eq(
   $$ SELECT count(*)::int FROM saved_places WHERE name = 'Le Comptoir' $$,
   ARRAY[0],
@@ -323,12 +331,32 @@ SELECT lives_ok(
   'group member can rate a place they can see'
 );
 
-SELECT tests.authenticate_as('charlie');
+SELECT tests.authenticate_as('dave');
 SELECT throws_ok(
   $$ INSERT INTO place_ratings (place_id, user_id, rating)
-     VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('charlie'), 'loved_it') $$,
+     VALUES ('11111111-1111-1111-1111-111111111111', tests.get_supabase_uid('dave'), 'loved_it') $$,
   NULL,
   'non-group member cannot rate a place they cannot see'
+);
+
+-- 015: the update policy re-checks visibility of the new place_id.
+SELECT tests.authenticate_as('bob');
+SELECT throws_ok(
+  $$ UPDATE place_ratings SET place_id = '22222222-2222-2222-2222-222222222222'
+     WHERE user_id = tests.get_supabase_uid('bob') $$,
+  NULL,
+  'cannot repoint own rating at a place you cannot see'
+);
+
+SELECT lives_ok(
+  $$ UPDATE place_ratings SET rating = 'want_to_try'
+     WHERE user_id = tests.get_supabase_uid('bob') $$,
+  'can still change own rating on a visible place'
+);
+
+SELECT ok(
+  (SELECT proconfig @> ARRAY['search_path=public'] FROM pg_proc WHERE proname = 'shares_group_with'),
+  'shares_group_with pins search_path'
 );
 
 -- Bob attempts to modify Alice's place directly — still owner-only for
