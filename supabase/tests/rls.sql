@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(33);
+SELECT plan(42);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -16,12 +16,12 @@ DO $$
 DECLARE
   alice_id UUID := tests.get_supabase_uid('alice');
   bob_id   UUID := tests.get_supabase_uid('bob');
-  gid      UUID := gen_random_uuid();
-  pid      UUID := gen_random_uuid();
+  gid      UUID := 'aaaaaaaa-0000-0000-0000-000000000001';
+  pid      UUID := 'bbbbbbbb-0000-0000-0000-000000000001';
 BEGIN
   -- Profile rows (normally created by trigger, but tests bypass it)
   INSERT INTO profiles (id, display_name) VALUES (alice_id, 'Alice'), (bob_id, 'Bob')
-  ON CONFLICT DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name;
 
   INSERT INTO groups (id, name, created_by, invite_code)
   VALUES (gid, 'Test Group', alice_id, 'TEST1234');
@@ -46,6 +46,7 @@ SELECT results_eq(
 
 -- Authenticate as a random user (not a member of any group)
 SELECT tests.create_supabase_user('charlie', 'charlie@test.com');
+SELECT tests.authenticate_as_service_role();
 INSERT INTO profiles (id, display_name)
 VALUES (tests.get_supabase_uid('charlie'), 'Charlie')
 ON CONFLICT DO NOTHING;
@@ -103,8 +104,7 @@ SELECT tests.authenticate_as('charlie');
 
 SELECT throws_ok(
   $$ INSERT INTO rsvps (ping_id, user_id, status)
-     SELECT p.id, tests.get_supabase_uid('charlie'), 'in'
-     FROM pings p WHERE p.message = 'Drinks tonight?' $$,
+     VALUES ('bbbbbbbb-0000-0000-0000-000000000001', tests.get_supabase_uid('charlie'), 'in') $$,
   'new row violates row-level security policy for table "rsvps"',
   'non-member cannot insert RSVP'
 );
@@ -155,10 +155,9 @@ SELECT lives_ok(
   'user can update their own profile'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$ UPDATE profiles SET display_name = 'Hacked' WHERE id = tests.get_supabase_uid('bob') $$,
-  NULL,
-  'user cannot update another profile'
+  'updating another profile is filtered by RLS rather than raising'
 );
 
 -- After the update, Bob's name should still be 'Bob'
@@ -176,7 +175,7 @@ SELECT tests.authenticate_as('charlie');
 SELECT lives_ok(
   $$ INSERT INTO group_members (group_id, user_id, role)
      SELECT g.id, tests.get_supabase_uid('charlie'), 'member'
-     FROM groups g WHERE g.invite_code = 'TEST1234' $$,
+     FROM lookup_group_by_invite_code('TEST1234') g $$,
   'user can self-join a group via invite code'
 );
 
@@ -186,9 +185,91 @@ SELECT results_eq(
   'charlie can now read the group after joining'
 );
 
+-- ─── Test: 016 membership policies ──────────────────────────
+-- Dave is in no group with Alice/Bob/Charlie; he creates his own group, which
+-- before 016 made him an "admin of any group" and so of every group.
+SELECT tests.create_supabase_user('dave', 'dave@test.com');
+SELECT tests.authenticate_as('dave');
+
+SELECT throws_ok(
+  $$ INSERT INTO group_members (group_id, user_id, role)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000001', tests.get_supabase_uid('dave'), 'admin') $$,
+  'new row violates row-level security policy for table "group_members"',
+  'cannot self-join a group as admin'
+);
+
+INSERT INTO groups (id, name, created_by, invite_code)
+VALUES ('aaaaaaaa-0000-0000-0000-000000000002', 'Dave Group', tests.get_supabase_uid('dave'), 'DAVE1234');
+
+SELECT lives_ok(
+  $$ INSERT INTO group_members (group_id, user_id, role)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000002', tests.get_supabase_uid('dave'), 'admin') $$,
+  'group creator can add themselves as admin'
+);
+
+INSERT INTO pings (id, group_id, created_by, message)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000002', tests.get_supabase_uid('dave'), 'Dave ping');
+
+-- Unfiltered writes: before 016 these hit every group's memberships.
+DELETE FROM group_members WHERE user_id <> tests.get_supabase_uid('dave');
+UPDATE group_members SET role = 'admin' WHERE user_id <> tests.get_supabase_uid('dave');
+
+SELECT tests.authenticate_as('alice');
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM group_members WHERE group_id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+  ARRAY[3],
+  'admin of another group cannot delete this group''s members'
+);
+
+SELECT results_eq(
+  $$ SELECT role FROM group_members
+     WHERE group_id = 'aaaaaaaa-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('bob') $$,
+  ARRAY['member'],
+  'admin of another group cannot change this group''s roles'
+);
+
+UPDATE group_members SET role = 'admin'
+WHERE group_id = 'aaaaaaaa-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('charlie');
+SELECT results_eq(
+  $$ SELECT role FROM group_members
+     WHERE group_id = 'aaaaaaaa-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('charlie') $$,
+  ARRAY['admin'],
+  'group admin can change roles in their own group'
+);
+UPDATE group_members SET role = 'member'
+WHERE group_id = 'aaaaaaaa-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('charlie');
+
+SELECT throws_ok(
+  $$ UPDATE pings SET group_id = 'aaaaaaaa-0000-0000-0000-000000000002'
+     WHERE id = 'bbbbbbbb-0000-0000-0000-000000000001' $$,
+  'new row violates row-level security policy for table "pings"',
+  'cannot move a ping into a group you are not in'
+);
+
+SELECT tests.authenticate_as('bob');
+SELECT throws_ok(
+  $$ UPDATE rsvps SET ping_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+     WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('bob') $$,
+  'new row violates row-level security policy for table "rsvps"',
+  'cannot move an RSVP onto a ping outside your groups'
+);
+
+SELECT throws_ok(
+  $$ UPDATE votes SET ping_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+     WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000001' AND user_id = tests.get_supabase_uid('bob') $$,
+  'new row violates row-level security policy for table "votes"',
+  'cannot move a vote onto a ping you are not in'
+);
+
+SELECT ok(
+  (SELECT proconfig @> ARRAY['search_path=public'] FROM pg_proc WHERE proname = 'is_group_admin'),
+  'is_group_admin pins search_path'
+);
+
 -- ─── Test: start_ping_voting RPC (vote timer feature) ─────────
 -- Two more 'open' pings for these tests, since pid above still needs to
 -- stay untouched for the tests above to have run against it.
+SELECT tests.authenticate_as_service_role();
 INSERT INTO pings (id, group_id, created_by, message, vote_timer_minutes)
 SELECT gen_random_uuid(), g.id, tests.get_supabase_uid('alice'), 'No-timer ping', NULL
 FROM groups g WHERE g.invite_code = 'TEST1234';
@@ -225,10 +306,10 @@ SELECT results_eq(
 
 -- Idempotency: calling it again on an already-'voting' ping is a no-op.
 SELECT results_eq(
-  $$ SELECT count(*)::int FROM start_ping_voting(
+  $$ SELECT id IS NULL FROM start_ping_voting(
        (SELECT id FROM pings WHERE message = 'No-timer ping')
      ) $$,
-  ARRAY[0],
+  ARRAY[true],
   'start_ping_voting is a no-op once the ping is no longer open'
 );
 
@@ -238,10 +319,10 @@ SELECT results_eq(
 SELECT tests.authenticate_as('bob');
 
 SELECT results_eq(
-  $$ SELECT count(*)::int FROM start_ping_voting(
+  $$ SELECT id IS NULL FROM start_ping_voting(
        (SELECT id FROM pings WHERE message = 'RLS-guarded ping')
      ) $$,
-  ARRAY[0],
+  ARRAY[true],
   'non-creator, non-admin member cannot start voting on someone else''s ping'
 );
 
@@ -289,21 +370,18 @@ SELECT tests.authenticate_as('bob');
 SELECT places_batch FROM request_more_places((SELECT id FROM pings WHERE message = 'Batch test ping'));
 
 SELECT results_eq(
-  $$ SELECT count(*)::int FROM request_more_places(
+  $$ SELECT id IS NULL FROM request_more_places(
        (SELECT id FROM pings WHERE message = 'Batch test ping')
      ) $$,
-  ARRAY[0],
+  ARRAY[true],
   'request_more_places is capped at 3 batches'
 );
 
 -- ─── Test: saved_places sharing + place_ratings (Places tab feature) ──
 -- Alice and Bob share "Test Group" (seeded at the top). Charlie joined it
--- via the invite test above, so the outsider here is Dave, who is in no group.
-SELECT tests.create_supabase_user('dave', 'dave@test.com');
-SELECT tests.clear_authentication();
-INSERT INTO profiles (id, display_name)
-VALUES (tests.get_supabase_uid('dave'), 'Dave')
-ON CONFLICT DO NOTHING;
+-- via the invite test above, so the outsider here is Dave, whose only group
+-- is his own.
+SELECT tests.authenticate_as_service_role();
 
 INSERT INTO saved_places (id, user_id, name, latitude, longitude)
 VALUES
