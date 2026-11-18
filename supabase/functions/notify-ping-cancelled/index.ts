@@ -4,6 +4,7 @@
  * (any status, excluding the creator).
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
+import { recipientIds } from './recipients.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -14,7 +15,7 @@ Deno.serve(async (req) => {
     }
 
     const { id: pingId, created_by, message } = record as {
-      id: string; created_by: string; message: string;
+      id: string; created_by: string | null; message: string;
     };
 
     const supabase = createServiceClient();
@@ -22,12 +23,14 @@ Deno.serve(async (req) => {
     const { data: rsvps } = await supabase
       .from('rsvps')
       .select('user_id')
-      .eq('ping_id', pingId)
-      .neq('user_id', created_by);
+      .eq('ping_id', pingId);
 
-    if (!rsvps?.length) return Response.json({ sent: 0 });
+    const userIds = recipientIds(
+      (rsvps ?? []).map((r: { user_id: string }) => r.user_id),
+      created_by,
+    );
+    if (!userIds.length) return Response.json({ sent: 0 });
 
-    const userIds = rsvps.map((r: { user_id: string }) => r.user_id);
     const { data: tokenRows } = await supabase
       .from('push_tokens')
       .select('token')
