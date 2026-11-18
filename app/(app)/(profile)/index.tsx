@@ -4,14 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   TextInput,
   Modal,
   Image,
   ScrollView,
-  Platform,
 } from 'react-native';
+import { showAlert, confirmAction } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -55,7 +54,7 @@ export default function ProfileScreen() {
     try {
       await updateProfile({ display_name: trimmed });
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not update name.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not update name.');
     } finally {
       setEditingName(false);
     }
@@ -68,22 +67,19 @@ export default function ProfileScreen() {
   }
 
   async function signOut() {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to sign out?')) {
-        await performSignOut();
-      }
-      return;
-    }
-    Alert.alert('Sign out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: performSignOut },
-    ]);
+    const ok = await confirmAction({
+      title: 'Sign out',
+      message: 'Are you sure?',
+      confirmText: 'Sign out',
+      destructive: true,
+    });
+    if (ok) await performSignOut();
   }
 
   async function handleJoin() {
     const code = inviteCode.trim().toUpperCase();
     if (code.length !== 8) {
-      Alert.alert('Invalid code', 'Invite codes are 8 characters long.');
+      showAlert('Invalid code', 'Invite codes are 8 characters long.');
       return;
     }
     try {
@@ -92,7 +88,7 @@ export default function ProfileScreen() {
       setInviteCode('');
       router.push(`/(app)/(groups)/${group.id}` as never);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Invalid invite code.');
+      showAlert('Error', err instanceof Error ? err.message : 'Invalid invite code.');
     }
   }
 

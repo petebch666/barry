@@ -6,11 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -110,14 +110,14 @@ export default function AddSavedPlaceScreen() {
         longitude: location.longitude,
       });
       if (!parsed.success) {
-        Alert.alert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
+        showAlert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
         return;
       }
       try {
         await updatePlace({ placeId: placeId!, updates: parsed.data });
         router.back();
       } catch (err) {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Could not update place.');
+        showAlert('Error', err instanceof Error ? err.message : 'Could not update place.');
       }
       return;
     }
@@ -131,7 +131,7 @@ export default function AddSavedPlaceScreen() {
     });
 
     if (!parsed.success) {
-      Alert.alert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
+      showAlert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
       return;
     }
 
@@ -144,7 +144,7 @@ export default function AddSavedPlaceScreen() {
       });
       router.back();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not save place.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not save place.');
     }
   }
 

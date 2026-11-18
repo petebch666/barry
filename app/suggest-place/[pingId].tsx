@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
-  Alert, KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSuggestPlace } from '@/hooks/usePlaces';
@@ -37,11 +38,11 @@ export default function SuggestPlaceModal() {
 
   async function submit() {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter the venue name.');
+      showAlert('Name required', 'Please enter the venue name.');
       return;
     }
     if (latitude == null || longitude == null) {
-      Alert.alert('Address required', 'Search and select an address.');
+      showAlert('Address required', 'Search and select an address.');
       return;
     }
 
@@ -56,7 +57,7 @@ export default function SuggestPlaceModal() {
       });
       router.back();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not add place.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not add place.');
     }
   }
 
@@ -72,7 +73,7 @@ export default function SuggestPlaceModal() {
       });
       router.back();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not add place.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not add place.');
     }
   }
 

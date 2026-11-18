@@ -4,9 +4,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Share,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +26,7 @@ export default function InviteModal() {
   async function copyLink() {
     if (!inviteLink) return;
     await Clipboard.setStringAsync(inviteLink);
-    Alert.alert('Copied', 'Invite link copied to clipboard.');
+    showAlert('Copied', 'Invite link copied to clipboard.');
   }
 
   async function shareLink() {
@@ -37,7 +37,7 @@ export default function InviteModal() {
         url: inviteLink,
       });
     } catch {
-      Alert.alert('Could not share', 'Please try again.');
+      showAlert('Could not share', 'Please try again.');
     }
   }
 

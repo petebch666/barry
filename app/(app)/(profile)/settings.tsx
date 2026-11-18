@@ -5,28 +5,21 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
-  Alert,
   Linking,
   ScrollView,
   Platform,
   Share,
   ActivityIndicator,
 } from 'react-native';
+import { showAlert, confirmAction } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
-import { supabase } from '@/lib/supabase';
 import { registerPushToken, deregisterPushToken } from '@/hooks/usePushToken';
-import { useProfile, useExportMyData } from '@/hooks/useProfile';
+import { useProfile, useExportMyData, useDeleteAccount } from '@/hooks/useProfile';
 import { exportFileName, formatExport } from '@/utils/exportFile';
 import { GlassCard } from '@/components/GlassCard';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
-
-// Alert.alert is a no-op in react-native-web.
-function showError(message: string) {
-  if (Platform.OS === 'web') window.alert(message);
-  else Alert.alert('Error', message);
-}
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -34,6 +27,7 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const { mutateAsync: exportMyData, isPending: isExporting } = useExportMyData();
+  const { mutateAsync: deleteMyAccount } = useDeleteAccount();
 
   useEffect(() => {
     Notifications.getPermissionsAsync().then(({ status }) => {
@@ -53,14 +47,12 @@ export default function SettingsScreen() {
         if (success) {
           setNotificationsEnabled(true);
         } else {
-          Alert.alert(
-            'Notifications blocked',
-            "Barry doesn't have notification permission. Enable it in your device settings.",
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open settings', onPress: () => Linking.openSettings() },
-            ],
-          );
+          const open = await confirmAction({
+            title: 'Notifications blocked',
+            message: "Barry doesn't have notification permission. Enable it in your device settings.",
+            confirmText: 'Open settings',
+          });
+          if (open) Linking.openSettings();
         }
       }
     } finally {
@@ -82,31 +74,25 @@ export default function SettingsScreen() {
         await Share.share({ title: exportFileName(new Date()), message: text });
       }
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Could not export your data.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not export your data.');
     }
   }
 
-  function confirmDeleteAccount() {
-    const message = 'This permanently deletes your account, saved places, RSVPs and location data. Groups and pings you created stay for the other members, without your name. This cannot be undone.';
-    if (Platform.OS === 'web') {
-      if (window.confirm(message)) deleteAccount();
-      return;
-    }
-    Alert.alert('Delete account', message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete my account', style: 'destructive', onPress: deleteAccount },
-    ]);
+  async function confirmDeleteAccount() {
+    const ok = await confirmAction({
+      title: 'Delete account',
+      message: 'This permanently deletes your account, saved places, RSVPs and location data. Groups and pings you created stay for the other members, without your name. This cannot be undone.',
+      confirmText: 'Delete my account',
+      destructive: true,
+    });
+    if (ok) deleteAccount();
   }
 
   async function deleteAccount() {
     try {
-      await deregisterPushToken();
-      await supabase.removeAllChannels();
-      const { error } = await supabase.rpc('delete_user');
-      if (error) throw error;
-      await supabase.auth.signOut();
+      await deleteMyAccount();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Could not delete account. Please try again.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not delete account. Please try again.');
     }
   }
 
