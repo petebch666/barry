@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { uniqueTopic } from '@/lib/realtime';
 import { SuggestPlaceSchema, type Place, type SuggestPlace } from '@/schemas';
 
 const QUERY_KEY = 'places';
@@ -33,7 +34,7 @@ export function usePlacesRealtime(pingId: string) {
     if (!pingId) return;
 
     const channel = supabase
-      .channel(`places:${pingId}`)
+      .channel(uniqueTopic(`places:${pingId}`))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'places', filter: `ping_id=eq.${pingId}` },
