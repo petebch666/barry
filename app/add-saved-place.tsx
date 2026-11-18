@@ -39,15 +39,14 @@ export default function AddSavedPlaceScreen() {
   const [address, setAddress] = useState('');
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState(PARIS);
-  // On native, delay rendering PinMapPicker until we know the starting location.
-  const [locationReady, setLocationReady] = useState(Platform.OS === 'web');
+  // Delay rendering PinMapPicker until the starting location is known: GPS on
+  // native, the saved coordinates when editing. It only reads initialLocation
+  // on mount.
+  const [locationReady, setLocationReady] = useState(Platform.OS === 'web' && !isEditing);
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
   const addressEditedByUser = useRef(false);
   const prefilled = useRef(false);
 
-  // Prefill from the existing place when editing. Location isn't editable
-  // (UpdateSavedPlaceSchema only covers name/address/category), so the
-  // location-picking UI is hidden entirely in edit mode instead.
   useEffect(() => {
     if (!isEditing || prefilled.current || !favoritePlaces) return;
     const existing = favoritePlaces.find((p) => p.id === placeId);
@@ -55,7 +54,8 @@ export default function AddSavedPlaceScreen() {
     setName(existing.name);
     setAddress(existing.address ?? '');
     setCategory(existing.category ?? '');
-    addressEditedByUser.current = true;
+    setLocation({ latitude: existing.latitude, longitude: existing.longitude });
+    setLocationReady(true);
     prefilled.current = true;
   }, [isEditing, placeId, favoritePlaces]);
 
@@ -106,6 +106,8 @@ export default function AddSavedPlaceScreen() {
         name: name.trim(),
         address: address.trim() || null,
         category: category.trim() || null,
+        latitude: location.latitude,
+        longitude: location.longitude,
       });
       if (!parsed.success) {
         Alert.alert('Invalid input', parsed.error.issues[0]?.message ?? 'Check your inputs.');
@@ -225,45 +227,27 @@ export default function AddSavedPlaceScreen() {
               <ActivityIndicator size="small" color={colors.textTertiary} />
             )}
           </View>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Address"
-              placeholderTextColor={colors.textTertiary}
-              maxLength={500}
-              accessibilityLabel="Address"
-            />
-          ) : (
-            <AddressAutocomplete
-              value={address}
-              onChangeText={(t) => {
-                addressEditedByUser.current = true;
-                setAddress(t);
-              }}
-              onSelect={handleAddressSelect}
-              placeholder="Search for an address…"
-            />
-          )}
+          <AddressAutocomplete
+            value={address}
+            onChangeText={(t) => {
+              addressEditedByUser.current = true;
+              setAddress(t);
+            }}
+            onSelect={handleAddressSelect}
+            placeholder="Search for an address…"
+          />
 
-          {isEditing ? (
-            <Text style={styles.hint}>Location can't be changed after saving — remove and re-add the place if it moved.</Text>
+          <Text style={styles.label}>Location</Text>
+          <Text style={styles.hint}>Search for an address above, or drag the pin to fine-tune.</Text>
+          {locationReady ? (
+            <PinMapPicker
+              initialLocation={location}
+              onLocationChange={handleLocationChange}
+            />
           ) : (
-            <>
-              <Text style={styles.label}>Location</Text>
-              <Text style={styles.hint}>Search for an address above, or drag the pin to fine-tune.</Text>
-              {locationReady ? (
-                <PinMapPicker
-                  initialLocation={location}
-                  onLocationChange={handleLocationChange}
-                />
-              ) : (
-                <View style={styles.mapPlaceholder}>
-                  <ActivityIndicator color={colors.accent} />
-                </View>
-              )}
-            </>
+            <View style={styles.mapPlaceholder}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
           )}
         </ScrollView>
       </SafeAreaView>
