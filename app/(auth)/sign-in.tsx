@@ -102,14 +102,12 @@ export default function SignInScreen() {
           </View>
 
           <View style={styles.card}>
-            {/* pointerEvents in both style (for web) and prop (for native BlurView) */}
             <BlurView
               tint="dark"
               intensity={50}
               style={styles.absoluteFillNoEvents}
-              pointerEvents="none"
             />
-            <View style={styles.cardOverlay} pointerEvents="none" />
+            <View style={styles.cardOverlay} />
 
             {/*
               Content must be in a positioned (position:relative) wrapper so it
@@ -206,9 +204,8 @@ function OAuthButton({
         tint="dark"
         intensity={40}
         style={styles.absoluteFillNoEvents}
-        pointerEvents="none"
       />
-      <View style={styles.oauthBtnOverlay} pointerEvents="none" />
+      <View style={styles.oauthBtnOverlay} />
       <View style={styles.oauthContent}>
         {loading ? (
           <ActivityIndicator color={colors.text} />
@@ -254,9 +251,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   absoluteFillNoEvents: {
-    // pointerEvents in style satisfies React Native Web (which deprecated the prop).
-    // The `pointerEvents="none"` prop on BlurView satisfies native where the style
-    // value isn't reliably forwarded through the native view bridge.
     position: 'absolute',
     top: 0,
     left: 0,
