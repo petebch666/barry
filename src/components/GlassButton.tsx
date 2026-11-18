@@ -50,7 +50,6 @@ export function GlassButton({
             tint="dark"
             intensity={40}
             style={styles.absoluteFillNoEvents}
-            pointerEvents="none"
           />
           <View style={styles.ghostOverlay} />
         </>

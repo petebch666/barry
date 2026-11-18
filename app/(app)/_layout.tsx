@@ -21,10 +21,9 @@ function GlassTabBar({ state, navigation }: BottomTabBarProps) {
         styles.tabBarOuter,
         { bottom: Math.max(insets.bottom, 8) + 16 },
       ]}
-      pointerEvents="box-none"
     >
       <View style={styles.tabBarInner}>
-        <BlurView tint="dark" intensity={65} style={styles.absoluteFillNoEvents} pointerEvents="none" />
+        <BlurView tint="dark" intensity={65} style={styles.absoluteFillNoEvents} />
         <View style={styles.tabBarOverlay} />
         {TABS.map((tab) => {
           const routeIndex = state.routes.findIndex((r: { name: string }) => r.name === tab.name);
@@ -76,6 +75,7 @@ export default function AppLayout() {
 
 const styles = StyleSheet.create({
   tabBarOuter: {
+    pointerEvents: 'box-none',
     position: 'absolute',
     left: 48,
     right: 48,

@@ -154,6 +154,10 @@ export const UpdateSavedPlaceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200).optional(),
   address: z.string().max(500).nullable().optional(),
   category: z.string().max(100).nullable().optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine((u) => (u.latitude === undefined) === (u.longitude === undefined), {
+  message: 'Latitude and longitude must be updated together',
 });
 
 // ─── Place ratings ──────────────────────────────────────────────────────────────

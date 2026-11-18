@@ -67,3 +67,25 @@ describe('UpdateSavedPlaceSchema', () => {
     expect(() => UpdateSavedPlaceSchema.parse({ category: 'x'.repeat(101) })).toThrow();
   });
 });
+
+describe('UpdateSavedPlaceSchema — location', () => {
+  test('accepts a new location', () => {
+    expect(() => UpdateSavedPlaceSchema.parse({ latitude: 48.86, longitude: 2.35 })).not.toThrow();
+  });
+
+  test('rejects latitude without longitude', () => {
+    expect(() => UpdateSavedPlaceSchema.parse({ latitude: 48.86 })).toThrow();
+  });
+
+  test('rejects longitude without latitude', () => {
+    expect(() => UpdateSavedPlaceSchema.parse({ longitude: 2.35 })).toThrow();
+  });
+
+  test('rejects out-of-range latitude', () => {
+    expect(() => UpdateSavedPlaceSchema.parse({ latitude: 91, longitude: 2.35 })).toThrow();
+  });
+
+  test('rejects out-of-range longitude', () => {
+    expect(() => UpdateSavedPlaceSchema.parse({ latitude: 48.86, longitude: -181 })).toThrow();
+  });
+});

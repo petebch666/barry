@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { uniqueTopic } from '@/lib/realtime';
 import { CastVoteSchema, type Vote, type CastVote } from '@/schemas';
 
 const QUERY_KEY = 'votes';
@@ -29,7 +30,7 @@ export function useVotesRealtime(pingId: string) {
     if (!pingId) return;
 
     const channel = supabase
-      .channel(`votes:${pingId}`)
+      .channel(uniqueTopic(`votes:${pingId}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'votes', filter: `ping_id=eq.${pingId}` },

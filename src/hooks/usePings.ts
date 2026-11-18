@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { uniqueTopic } from '@/lib/realtime';
 import { CreatePingSchema, type Ping, type Place, type CreatePing } from '@/schemas';
 
 const QUERY_KEY = 'pings';
@@ -36,7 +37,7 @@ export function useFeedPingsRealtime() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('feed-pings')
+      .channel(uniqueTopic('feed-pings'))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pings' },
@@ -98,7 +99,7 @@ export function usePingRealtime(pingId: string) {
     if (!pingId) return;
 
     const channel = supabase
-      .channel(`ping-status:${pingId}`)
+      .channel(uniqueTopic(`ping-status:${pingId}`))
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'pings', filter: `id=eq.${pingId}` },

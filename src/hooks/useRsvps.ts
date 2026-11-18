@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { uniqueTopic } from '@/lib/realtime';
 import { UpsertRsvpSchema, type Rsvp, type UpsertRsvp } from '@/schemas';
 
 const QUERY_KEY = 'rsvps';
@@ -33,7 +34,7 @@ export function useRsvpsRealtime(pingId: string) {
     if (!pingId) return;
 
     const channel = supabase
-      .channel(`rsvps:${pingId}`)
+      .channel(uniqueTopic(`rsvps:${pingId}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rsvps', filter: `ping_id=eq.${pingId}` },

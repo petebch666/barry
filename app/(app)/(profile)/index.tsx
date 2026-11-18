@@ -236,9 +236,9 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowJoinModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView tint="dark" intensity={60} style={styles.absoluteFillNoEvents} pointerEvents="none" />
+          <BlurView tint="dark" intensity={60} style={styles.absoluteFillNoEvents} />
           <View style={styles.modalBox}>
-            <BlurView tint="dark" intensity={50} style={styles.absoluteFillNoEvents} pointerEvents="none" />
+            <BlurView tint="dark" intensity={50} style={styles.absoluteFillNoEvents} />
             <View style={styles.modalBg} />
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Join with invite code</Text>
