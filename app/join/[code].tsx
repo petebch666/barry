@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGroupByInviteCode, useJoinGroup } from '@/hooks/useGroups';
@@ -20,9 +21,9 @@ export default function JoinGroupScreen() {
 
   useEffect(() => {
     if (!isLoading && !group && code) {
-      Alert.alert('Invalid invite', 'This invite link is no longer valid.', [
-        { text: 'OK', onPress: () => router.replace('/(app)/(feed)') },
-      ]);
+      showAlert('Invalid invite', 'This invite link is no longer valid.', () =>
+        router.replace('/(app)/(feed)'),
+      );
     }
   }, [isLoading, group, code, router]);
 
@@ -32,7 +33,7 @@ export default function JoinGroupScreen() {
       await joinGroup(code ?? '');
       router.replace(`/(app)/(groups)/${group.id}` as never);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not join this group.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not join this group.');
     }
   }
 

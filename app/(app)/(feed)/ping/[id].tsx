@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePing, usePingRealtime, useStartVoting, useCancelPing, useRequestMorePlaces } from '@/hooks/usePings';
@@ -89,35 +90,25 @@ export default function PingDetailScreen() {
   const isActive = ping.status === 'open' || ping.status === 'voting';
 
   async function handleCancelPing() {
-    const doCancel = () => cancelPing(pingId);
-    if (Platform.OS === 'web') {
-      if (window.confirm('Cancel this ping? All members will be notified.')) doCancel();
-    } else {
-      Alert.alert(
-        'Cancel ping',
-        'All members will be notified. This cannot be undone.',
-        [
-          { text: 'Keep it', style: 'cancel' },
-          { text: 'Cancel ping', style: 'destructive', onPress: doCancel },
-        ],
-      );
-    }
+    const ok = await confirmAction({
+      title: 'Cancel ping',
+      message: 'All members will be notified. This cannot be undone.',
+      confirmText: 'Cancel ping',
+      cancelText: 'Keep it',
+      destructive: true,
+    });
+    if (ok) cancelPing(pingId);
   }
 
   async function handleLeavePing() {
-    const doLeave = () => upsertRsvp({ ping_id: pingId, status: 'out', location: null });
-    if (Platform.OS === 'web') {
-      if (window.confirm('Leave this ping? Others may be notified if the meeting point shifts.')) doLeave();
-    } else {
-      Alert.alert(
-        'Leave ping',
-        'Others may be notified if the meeting point shifts significantly.',
-        [
-          { text: 'Stay', style: 'cancel' },
-          { text: 'Leave', style: 'destructive', onPress: doLeave },
-        ],
-      );
-    }
+    const ok = await confirmAction({
+      title: 'Leave ping',
+      message: 'Others may be notified if the meeting point shifts significantly.',
+      confirmText: 'Leave',
+      cancelText: 'Stay',
+      destructive: true,
+    });
+    if (ok) upsertRsvp({ ping_id: pingId, status: 'out', location: null });
   }
 
   return (

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -50,7 +51,7 @@ export default function RsvpModal() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert(
+          showAlert(
             'Location permission denied',
             'Barry needs location access. You can still RSVP without sharing your location.',
           );
@@ -64,7 +65,7 @@ export default function RsvpModal() {
         // Browser/OS-level failures (e.g. web geolocation blocked on an
         // insecure origin) surface here rather than leaving the modal in an
         // inconsistent state.
-        Alert.alert(
+        showAlert(
           "Couldn't get your location",
           "Try 'Set on map' instead.",
         );
@@ -111,7 +112,7 @@ export default function RsvpModal() {
       await upsertRsvp({ ping_id: pingId, status: selected, location: location ?? undefined });
       router.back();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not save your RSVP.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not save your RSVP.');
     }
   }
 

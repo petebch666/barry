@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { showAlert, confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFavoritePlaces, useRatePlace } from '@/hooks/useFavoritePlaces';
@@ -39,23 +40,22 @@ export default function PlaceDetailScreen() {
   const isOwner = place.user_id === profile?.id;
   const myRating = place.place_ratings.find((r) => r.user_id === profile?.id)?.rating;
 
-  function handleDelete() {
+  async function handleDelete() {
     const doDelete = async () => {
       try {
         await deletePlace(place!.id);
         router.back();
       } catch (err) {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Could not remove place.');
+        showAlert('Error', err instanceof Error ? err.message : 'Could not remove place.');
       }
     };
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Remove "${place!.name}"?`)) doDelete();
-    } else {
-      Alert.alert('Remove place', `Remove "${place!.name}"?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: doDelete },
-      ]);
-    }
+    const ok = await confirmAction({
+      title: 'Remove place',
+      message: `Remove "${place!.name}"?`,
+      confirmText: 'Remove',
+      destructive: true,
+    });
+    if (ok) doDelete();
   }
 
   return (

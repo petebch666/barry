@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCreatePing } from '@/hooks/usePings';
@@ -31,12 +32,12 @@ export default function CreatePingModal() {
 
   async function submit() {
     if (!selectedGroupId) {
-      Alert.alert('Select a group', 'Please choose which group to ping.');
+      showAlert('Select a group', 'Please choose which group to ping.');
       return;
     }
     const trimmed = message.trim();
     if (!trimmed) {
-      Alert.alert('Message required', 'Tell your friends why you\'re pinging them.');
+      showAlert('Message required', 'Tell your friends why you\'re pinging them.');
       return;
     }
     try {
@@ -47,7 +48,7 @@ export default function CreatePingModal() {
       });
       router.replace(`/(app)/(feed)/ping/${ping.id}`);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not send ping.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not send ping.');
     }
   }
 

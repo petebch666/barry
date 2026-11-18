@@ -4,9 +4,9 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { showAlert, confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGroupMembers, useUpdateMemberRole, useRemoveMember } from '@/hooks/useGroups';
@@ -36,63 +36,57 @@ export default function MembersScreen() {
   const isAdmin = currentMember?.role === 'admin';
   const adminCount = typedMembers.filter((m) => m.role === 'admin').length;
 
-  function confirmRemove(member: Member) {
+  async function confirmRemove(member: Member) {
     const isSelf = member.user_id === currentUserId;
+    const displayName = member.profiles?.display_name ?? 'this member';
 
-    if (isSelf && isAdmin && adminCount === 1) {
-      Alert.alert('Cannot leave', 'You are the only admin. Promote another member before leaving.');
-      return;
+    // Migration 017 hands the admin role to the longest-standing member when
+    // the last admin leaves, and deletes a group left with no members.
+    let leaveMessage = 'You will lose access to this group and all its pings.';
+    if (isSelf && typedMembers.length === 1) {
+      leaveMessage = "You're the only member, so the group and its pings will be deleted.";
+    } else if (isSelf && isAdmin && adminCount === 1) {
+      const successor = typedMembers
+        .filter((m) => m.user_id !== currentUserId)
+        .sort((x, y) => x.joined_at.localeCompare(y.joined_at))[0];
+      leaveMessage += ` ${successor?.profiles?.display_name ?? 'The longest-standing member'} will become admin.`;
     }
 
-    const displayName = member.profiles?.display_name ?? 'this member';
-    Alert.alert(
-      isSelf ? 'Leave group?' : `Remove ${displayName}?`,
-      isSelf
-        ? 'You will lose access to this group and all its pings.'
-        : `${displayName} will lose access to the group.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isSelf ? 'Leave' : 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeMember(member.user_id);
-              if (isSelf) router.replace('/(app)/(profile)');
-            } catch {
-              Alert.alert('Error', 'Could not complete the action. Please try again.');
-            }
-          },
-        },
-      ],
-    );
+    const ok = await confirmAction({
+      title: isSelf ? 'Leave group?' : `Remove ${displayName}?`,
+      message: isSelf ? leaveMessage : `${displayName} will lose access to the group.`,
+      confirmText: isSelf ? 'Leave' : 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await removeMember(member.user_id);
+      if (isSelf) router.replace('/(app)/(profile)');
+    } catch {
+      showAlert('Error', 'Could not complete the action. Please try again.');
+    }
   }
 
-  function confirmRoleChange(member: Member) {
+  async function confirmRoleChange(member: Member) {
     const newRole: 'admin' | 'member' = member.role === 'admin' ? 'member' : 'admin';
     const displayName = member.profiles?.display_name ?? 'This member';
     const label = newRole === 'admin' ? 'Make admin' : 'Remove admin';
 
-    Alert.alert(
-      label,
-      newRole === 'admin'
+    const ok = await confirmAction({
+      title: label,
+      message: newRole === 'admin'
         ? `${displayName} will be able to manage the group and its members.`
         : `${displayName} will become a regular member.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: label,
-          onPress: async () => {
-            try {
-              await updateRole({ userId: member.user_id, role: newRole });
-            } catch {
-              Alert.alert('Error', 'Could not update role. Please try again.');
-            }
-          },
-        },
-      ],
-    );
+      confirmText: label,
+    });
+    if (!ok) return;
+    try {
+      await updateRole({ userId: member.user_id, role: newRole });
+    } catch {
+      showAlert('Error', 'Could not update role. Please try again.');
+    }
   }
+
 
   const isBusy = updatingRole || removing;
 

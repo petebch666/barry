@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { deregisterPushToken } from '@/hooks/usePushToken';
 import { ProfileSchema, SavedPlaceSchema, type Profile, type SavedPlace } from '@/schemas';
 import { z } from 'zod';
 
@@ -127,6 +128,18 @@ export function useExportMyData() {
       const { data, error } = await supabase.rpc('export_my_data');
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: async () => {
+      await deregisterPushToken();
+      await supabase.removeAllChannels();
+      const { error } = await supabase.rpc('delete_user');
+      if (error) throw error;
+      await supabase.auth.signOut();
     },
   });
 }

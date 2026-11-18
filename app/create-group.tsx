@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCreateGroup } from '@/hooks/useGroups';
@@ -17,14 +18,14 @@ export default function CreateGroupModal() {
   async function submit() {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert('Name required', 'Please give your group a name.');
+      showAlert('Name required', 'Please give your group a name.');
       return;
     }
     try {
       const group = await createGroup({ name: trimmed, description: description.trim() || undefined });
       router.replace(`/(app)/(groups)/${group.id}` as never);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not create group.');
+      showAlert('Error', err instanceof Error ? err.message : 'Could not create group.');
     }
   }
 

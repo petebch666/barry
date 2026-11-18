@@ -5,12 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { BlurView } from 'expo-blur';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -58,7 +58,7 @@ export default function SignInScreen() {
         }
       }
     } catch (err) {
-      Alert.alert('Sign-in error', err instanceof Error ? err.message : 'Authentication failed');
+      showAlert('Sign-in error', err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setLoading(null);
     }
@@ -80,7 +80,7 @@ export default function SignInScreen() {
       } else {
         const { error: signUpError } = await supabase.auth.signUp(parsed.data);
         if (signUpError) throw signUpError;
-        Alert.alert(
+        showAlert(
           'Check your email',
           'We sent you a confirmation link. Click it to activate your account.',
         );
