@@ -79,7 +79,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           id: string
           invite_code: string
@@ -88,7 +88,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           description?: string | null
           id?: string
           invite_code: string
@@ -97,7 +97,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           id?: string
           invite_code?: string
@@ -117,7 +117,7 @@ export type Database = {
         Row: {
           confirmed_place_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           expires_at: string
           group_id: string
           id: string
@@ -131,7 +131,7 @@ export type Database = {
         Insert: {
           confirmed_place_id?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           expires_at?: string
           group_id: string
           id?: string
@@ -145,7 +145,7 @@ export type Database = {
         Update: {
           confirmed_place_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           expires_at?: string
           group_id?: string
           id?: string
@@ -505,7 +505,7 @@ export type Database = {
         Returns: {
           confirmed_place_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           expires_at: string
           group_id: string
           id: string
@@ -529,7 +529,7 @@ export type Database = {
         Returns: {
           confirmed_place_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           expires_at: string
           group_id: string
           id: string
