@@ -23,7 +23,7 @@ export const GroupSchema = z.object({
   name: z.string().min(1).max(50),
   description: z.string().max(200).nullable(),
   avatar_url: z.string().url().nullable(),
-  created_by: z.string().uuid(),
+  created_by: z.string().uuid().nullable(),
   invite_code: z.string().length(8),
   created_at: z.string().datetime(),
 });
@@ -40,7 +40,7 @@ export const PingStatusSchema = z.enum(['open', 'voting', 'confirmed', 'cancelle
 export const PingSchema = z.object({
   id: z.string().uuid(),
   group_id: z.string().uuid(),
-  created_by: z.string().uuid(),
+  created_by: z.string().uuid().nullable(),
   message: z.string().min(1).max(500),
   proposed_time: z.string().datetime().nullable(),
   status: PingStatusSchema,

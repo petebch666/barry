@@ -3,6 +3,7 @@
  * Run with: deno test supabase/functions/notify-ping-cancelled/notify-ping-cancelled.test.ts
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { recipientIds } from './recipients.ts';
 
 // ─── Extracted pure functions (mirrored from index.ts for unit testing) ────────
 
@@ -54,4 +55,16 @@ Deno.test('buildNotificationBody — message exactly 80 chars is not truncated',
   const msg = 'B'.repeat(80);
   const body = buildNotificationBody(msg);
   assertEquals(body, `"${'B'.repeat(80)}" has been cancelled.`);
+});
+
+Deno.test('recipientIds — excludes the creator', () => {
+  assertEquals(recipientIds(['creator', 'a', 'b'], 'creator'), ['a', 'b']);
+});
+
+Deno.test('recipientIds — creator deleted their account: everyone is notified', () => {
+  assertEquals(recipientIds(['a', 'b'], null), ['a', 'b']);
+});
+
+Deno.test('recipientIds — only the creator RSVPd: nobody to notify', () => {
+  assertEquals(recipientIds(['creator'], 'creator'), []);
 });

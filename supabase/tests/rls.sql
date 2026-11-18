@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(42);
+SELECT plan(50);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -471,6 +471,86 @@ SELECT results_eq(
   $$ SELECT count(*)::int FROM place_ratings WHERE place_id = '11111111-1111-1111-1111-111111111111' $$,
   ARRAY[0],
   'deleting a place cascades to its ratings'
+);
+
+-- ─── Test: account deletion keeps shared data (017) ─────────
+-- Erin created a group, a ping and a venue. Frank joined before Gina.
+-- Hank is alone in his own group.
+SELECT tests.create_supabase_user('erin',  'erin@test.com');
+SELECT tests.create_supabase_user('frank', 'frank@test.com');
+SELECT tests.create_supabase_user('gina',  'gina@test.com');
+SELECT tests.create_supabase_user('hank',  'hank@test.com');
+SELECT tests.authenticate_as_service_role();
+DO $$
+DECLARE
+  erin_id  UUID := tests.get_supabase_uid('erin');
+  frank_id UUID := tests.get_supabase_uid('frank');
+  gina_id  UUID := tests.get_supabase_uid('gina');
+  hank_id  UUID := tests.get_supabase_uid('hank');
+BEGIN
+  INSERT INTO groups (id, name, created_by, invite_code) VALUES
+    ('cccccccc-0000-0000-0000-000000000001', 'Erin Group', erin_id, 'ERIN1234'),
+    ('cccccccc-0000-0000-0000-000000000002', 'Hank Group', hank_id, 'HANK1234');
+  INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES
+    ('cccccccc-0000-0000-0000-000000000001', erin_id,  'admin',  NOW() - INTERVAL '3 days'),
+    ('cccccccc-0000-0000-0000-000000000001', frank_id, 'member', NOW() - INTERVAL '2 days'),
+    ('cccccccc-0000-0000-0000-000000000001', gina_id,  'member', NOW() - INTERVAL '1 day'),
+    ('cccccccc-0000-0000-0000-000000000002', hank_id,  'admin',  NOW());
+  INSERT INTO pings (id, group_id, created_by, message)
+  VALUES ('dddddddd-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000001', erin_id, 'Erin ping');
+  INSERT INTO places (id, ping_id, name, latitude, longitude, source, suggested_by)
+  VALUES ('eeeeeeee-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000001',
+          'Erin bar', 48.86, 2.35, 'manual', erin_id);
+END;
+$$;
+
+SELECT tests.authenticate_as('erin');
+SELECT lives_ok(
+  $$ SELECT delete_user() $$,
+  'a user who created a group, a ping and a venue can delete their account'
+);
+
+SELECT tests.authenticate_as_service_role();
+SELECT results_eq(
+  $$ SELECT created_by IS NULL FROM groups WHERE id = 'cccccccc-0000-0000-0000-000000000001' $$,
+  ARRAY[true],
+  'their group stays, with no creator'
+);
+SELECT results_eq(
+  $$ SELECT created_by IS NULL FROM pings WHERE id = 'dddddddd-0000-0000-0000-000000000001' $$,
+  ARRAY[true],
+  'their ping stays, with no creator'
+);
+SELECT results_eq(
+  $$ SELECT suggested_by IS NULL FROM places WHERE id = 'eeeeeeee-0000-0000-0000-000000000001' $$,
+  ARRAY[true],
+  'their venue stays, with no suggester'
+);
+SELECT results_eq(
+  $$ SELECT role FROM group_members
+     WHERE group_id = 'cccccccc-0000-0000-0000-000000000001'
+     ORDER BY joined_at $$,
+  ARRAY['admin', 'member'],
+  'the longest-standing remaining member becomes admin'
+);
+
+-- Leaving as the only admin hands the role on too.
+SELECT tests.authenticate_as('frank');
+DELETE FROM group_members
+WHERE group_id = 'cccccccc-0000-0000-0000-000000000001' AND user_id = auth.uid();
+SELECT tests.authenticate_as_service_role();
+SELECT results_eq(
+  $$ SELECT role FROM group_members WHERE group_id = 'cccccccc-0000-0000-0000-000000000001' $$,
+  ARRAY['admin'],
+  'the only admin leaving promotes the next member'
+);
+
+SELECT tests.authenticate_as('hank');
+SELECT lives_ok($$ SELECT delete_user() $$, 'the only member of a group can delete their account');
+SELECT tests.authenticate_as_service_role();
+SELECT is_empty(
+  $$ SELECT 1 FROM groups WHERE id = 'cccccccc-0000-0000-0000-000000000002' $$,
+  'a group left with no members is removed'
 );
 
 SELECT * FROM finish();
