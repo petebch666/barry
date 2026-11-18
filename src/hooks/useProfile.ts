@@ -119,3 +119,14 @@ export function useSavedPlaces() {
     },
   });
 }
+
+/** Everything stored about the current user, for GDPR access requests. */
+export function useExportMyData() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('export_my_data');
+      if (error) throw error;
+      return data;
+    },
+  });
+}

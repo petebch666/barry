@@ -8,21 +8,32 @@ import {
   Alert,
   Linking,
   ScrollView,
+  Platform,
+  Share,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import { registerPushToken, deregisterPushToken } from '@/hooks/usePushToken';
-import { useProfile } from '@/hooks/useProfile';
+import { useProfile, useExportMyData } from '@/hooks/useProfile';
+import { exportFileName, formatExport } from '@/utils/exportFile';
 import { GlassCard } from '@/components/GlassCard';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
+
+// Alert.alert is a no-op in react-native-web.
+function showError(message: string) {
+  if (Platform.OS === 'web') window.alert(message);
+  else Alert.alert('Error', message);
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { data: profile } = useProfile();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
+  const { mutateAsync: exportMyData, isPending: isExporting } = useExportMyData();
 
   useEffect(() => {
     Notifications.getPermissionsAsync().then(({ status }) => {
@@ -57,15 +68,34 @@ export default function SettingsScreen() {
     }
   }
 
+  async function exportData() {
+    try {
+      const text = formatExport(await exportMyData());
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = exportFileName(new Date());
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({ title: exportFileName(new Date()), message: text });
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Could not export your data.');
+    }
+  }
+
   function confirmDeleteAccount() {
-    Alert.alert(
-      'Delete account',
-      'This permanently deletes your profile, groups, pings, saved places, and location data. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete my account', style: 'destructive', onPress: deleteAccount },
-      ],
-    );
+    const message = 'This permanently deletes your account, saved places, RSVPs and location data. Groups and pings you created stay for the other members, without your name. This cannot be undone.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) deleteAccount();
+      return;
+    }
+    Alert.alert('Delete account', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete my account', style: 'destructive', onPress: deleteAccount },
+    ]);
   }
 
   async function deleteAccount() {
@@ -76,7 +106,7 @@ export default function SettingsScreen() {
       if (error) throw error;
       await supabase.auth.signOut();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete account. Please try again.');
+      showError(err instanceof Error ? err.message : 'Could not delete account. Please try again.');
     }
   }
 
@@ -115,6 +145,25 @@ export default function SettingsScreen() {
           <GlassCard style={styles.card}>
             <TouchableOpacity
               style={styles.destructiveRow}
+              onPress={exportData}
+              disabled={isExporting}
+              accessibilityRole="button"
+              accessibilityLabel="Export my data"
+            >
+              <Text style={styles.settingLabel}>Export my data</Text>
+              {isExporting ? (
+                <ActivityIndicator color={colors.textTertiary} />
+              ) : (
+                <Text style={styles.chevron}>›</Text>
+              )}
+            </TouchableOpacity>
+          </GlassCard>
+          <Text style={styles.destructiveHint}>
+            A copy of everything Barry stores about you, as a JSON file.
+          </Text>
+          <GlassCard style={[styles.card, { marginTop: 16 }]}>
+            <TouchableOpacity
+              style={styles.destructiveRow}
               onPress={confirmDeleteAccount}
               accessibilityRole="button"
               accessibilityLabel="Delete my account"
@@ -124,7 +173,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </GlassCard>
           <Text style={styles.destructiveHint}>
-            Permanently removes your profile, groups, pings, and location data. This action cannot be reversed.
+            Permanently removes your account and everything tied to it. Groups, pings and venues you created stay for the other members, without your name. This cannot be undone.
           </Text>
         </ScrollView>
       </SafeAreaView>

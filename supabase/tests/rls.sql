@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(50);
+SELECT plan(60);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -551,6 +551,66 @@ SELECT tests.authenticate_as_service_role();
 SELECT is_empty(
   $$ SELECT 1 FROM groups WHERE id = 'cccccccc-0000-0000-0000-000000000002' $$,
   'a group left with no members is removed'
+);
+
+-- ─── Test: export_my_data (018) ─────────────────────────────
+-- Bob has an RSVP and a vote in Test Group; Alice and Charlie have rows too.
+SELECT tests.authenticate_as('bob');
+SELECT results_eq(
+  $$ SELECT (export_my_data() -> 'account' ->> 'id')::uuid $$,
+  ARRAY[tests.get_supabase_uid('bob')],
+  'the export is about the caller'
+);
+SELECT results_eq(
+  $$ SELECT export_my_data() -> 'profile' ->> 'display_name' $$,
+  ARRAY['Bob'],
+  'the export includes the caller''s profile'
+);
+SELECT ok(
+  (SELECT jsonb_array_length(export_my_data() -> 'rsvps') >= 1),
+  'the export includes the caller''s RSVPs'
+);
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM rsvps WHERE user_id = auth.uid() $$,
+  $$ SELECT jsonb_array_length(export_my_data() -> 'rsvps') $$,
+  'the export has exactly the caller''s RSVPs, none of other members'
+);
+SELECT is(
+  jsonb_array_length(export_my_data() -> 'pings_sent'),
+  0,
+  'pings sent by other members are not exported'
+);
+SELECT tests.clear_authentication();
+SELECT throws_ok(
+  $$ SELECT export_my_data() $$,
+  '42501',
+  NULL,
+  'anonymous callers cannot export'
+);
+
+-- ─── Test: anon function access (019) ───────────────────────
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+      AND p.proname NOT IN ('is_group_member', 'is_group_admin', 'shares_group_with')
+      AND has_function_privilege('anon', p.oid, 'EXECUTE')
+  ),
+  'anon can execute no SECURITY DEFINER function except the RLS helpers'
+);
+SELECT ok(
+  NOT has_function_privilege('authenticated', 'cancel_expired_pings()', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'nullify_terminal_ping_locations()', 'EXECUTE'),
+  'signed-in users cannot run the scheduled jobs'
+);
+SELECT ok(
+  has_function_privilege('authenticated', 'lookup_group_by_invite_code(text)', 'EXECUTE')
+  AND has_function_privilege('authenticated', 'delete_user()', 'EXECUTE'),
+  'signed-in users keep the functions the app calls'
+);
+SELECT ok(
+  has_function_privilege('anon', 'is_group_member(uuid)', 'EXECUTE'),
+  'RLS helpers stay callable so anon queries return nothing instead of erroring'
 );
 
 SELECT * FROM finish();

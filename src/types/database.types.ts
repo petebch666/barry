@@ -489,6 +489,7 @@ export type Database = {
     Functions: {
       cancel_expired_pings: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
+      export_my_data: { Args: never; Returns: Json }
       is_group_admin: { Args: { gid: string }; Returns: boolean }
       is_group_member: { Args: { gid: string }; Returns: boolean }
       lookup_group_by_invite_code: {
