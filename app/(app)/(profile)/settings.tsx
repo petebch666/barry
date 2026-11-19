@@ -147,6 +147,17 @@ export default function SettingsScreen() {
           <GlassCard style={styles.card}>
             <TouchableOpacity
               style={styles.destructiveRow}
+              onPress={() => router.push('/change-password')}
+              accessibilityRole="button"
+              accessibilityLabel="Change password"
+            >
+              <Text style={styles.settingLabel}>Change password</Text>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          </GlassCard>
+          <GlassCard style={[styles.card, { marginTop: 16 }]}>
+            <TouchableOpacity
+              style={styles.destructiveRow}
               onPress={exportData}
               disabled={isExporting}
               accessibilityRole="button"

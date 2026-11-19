@@ -2,7 +2,8 @@ import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { supabase } from '@/lib/supabase';
-import { useExchangeAuthCode, useRequestPasswordReset, useSetNewPassword } from '@/hooks/useAuth';
+import { useChangePassword, useExchangeAuthCode, useRequestPasswordReset, useSetNewPassword } from '@/hooks/useAuth';
+import { ChangePasswordSchema } from '@/schemas';
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -10,6 +11,8 @@ jest.mock('@/lib/supabase', () => ({
       resetPasswordForEmail: jest.fn(),
       updateUser: jest.fn(),
       exchangeCodeForSession: jest.fn(),
+      getUser: jest.fn(),
+      signInWithPassword: jest.fn(),
     },
   },
 }));
@@ -87,5 +90,45 @@ describe('useExchangeAuthCode', () => {
     auth.exchangeCodeForSession.mockResolvedValue({ data: {}, error: new Error('invalid flow state') } as never);
     const { result } = await renderHook(() => useExchangeAuthCode('old'), { wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe('ChangePasswordSchema', () => {
+  it('accepts a new password of 8+ characters', () => {
+    expect(ChangePasswordSchema.safeParse({ current: 'old-password', next: 'new-password' }).success).toBe(true);
+  });
+
+  it('rejects reusing the current password', () => {
+    expect(ChangePasswordSchema.safeParse({ current: 'same-password', next: 'same-password' }).success).toBe(false);
+  });
+
+  it('rejects a short new password', () => {
+    expect(ChangePasswordSchema.safeParse({ current: 'old-password', next: 'short' }).success).toBe(false);
+  });
+});
+
+describe('useChangePassword', () => {
+  beforeEach(() => {
+    auth.getUser.mockResolvedValue({ data: { user: { email: 'ana@example.org' } }, error: null } as never);
+  });
+
+  it('checks the current password, then saves the new one', async () => {
+    auth.signInWithPassword.mockResolvedValueOnce({ data: {}, error: null } as never);
+    auth.updateUser.mockResolvedValueOnce({ data: {}, error: null } as never);
+    const { result } = await renderHook(() => useChangePassword(), { wrapper });
+    await act(() => result.current.mutateAsync({ current: 'old-password', next: 'new-password' }));
+
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'ana@example.org', password: 'old-password' });
+    expect(auth.updateUser).toHaveBeenCalledWith({ password: 'new-password' });
+  });
+
+  it('refuses when the current password is wrong', async () => {
+    auth.signInWithPassword.mockResolvedValueOnce({ data: {}, error: new Error('Invalid login credentials') } as never);
+    const { result } = await renderHook(() => useChangePassword(), { wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync({ current: 'wrong-pass', next: 'new-password' }))
+        .rejects.toThrow('Your current password is incorrect');
+    });
+    expect(auth.updateUser).not.toHaveBeenCalled();
   });
 });
