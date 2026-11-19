@@ -185,6 +185,14 @@ export const EmailAuthSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+export const ChangePasswordSchema = z.object({
+  current: z.string().min(1, 'Enter your current password'),
+  next: EmailAuthSchema.shape.password,
+}).refine((p) => p.next !== p.current, {
+  message: 'Choose a password different from the current one',
+  path: ['next'],
+});
+
 
 // ─── Feedback ────────────────────────────────────────────────────────────────
 
@@ -228,3 +236,4 @@ export type RatePlace = z.infer<typeof RatePlaceSchema>;
 export type EmailAuth = z.infer<typeof EmailAuthSchema>;
 export type FeedbackRating = z.infer<typeof FeedbackRatingSchema>;
 export type SendFeedback = z.infer<typeof SendFeedbackSchema>;
+export type ChangePassword = z.infer<typeof ChangePasswordSchema>;

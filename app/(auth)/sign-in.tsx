@@ -16,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { useRouter } from 'expo-router';
 import { authRedirect } from '@/lib/authRedirect';
+import { INVITE_ONLY } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 import { EmailAuthSchema } from '@/schemas';
 import { colors, radii } from '@/lib/theme';
@@ -163,39 +164,51 @@ export default function SignInScreen() {
                 )}
               </TouchableOpacity>
 
-              {mode === 'signin' && (
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/(auth)/forgot-password', params: { email } })}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.toggleText}>Forgot password?</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(null); }}
-                accessibilityRole="button"
-              >
-                <Text style={styles.toggleText}>
-                  {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {INVITE_ONLY ? (
+                <Text style={styles.inviteHint}>
+                  Barry is in private beta. Forgot your password, or need an account? Ask the person who invited you.
                 </Text>
-              </TouchableOpacity>
+              ) : (
+                <>
+                  {mode === 'signin' && (
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: '/(auth)/forgot-password', params: { email } })}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.toggleText}>Forgot password?</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(null); }}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.toggleText}>
+                      {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          {!INVITE_ONLY && (
+            <>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          <OAuthButton
-            label="Continue with Apple"
-            prefix=""
-            onPress={() => signInWith('apple')}
-            loading={loading === 'apple'}
-            disabled={loading !== null}
-          />
+              <OAuthButton
+                label="Continue with Apple"
+                prefix=""
+                onPress={() => signInWith('apple')}
+                loading={loading === 'apple'}
+                disabled={loading !== null}
+              />
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -313,6 +326,12 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   btnDisabled: { opacity: 0.45 },
+  inviteHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   toggleText: {
     textAlign: 'center',
     fontSize: 14,

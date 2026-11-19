@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { authRedirect } from '@/lib/authRedirect';
-import { EmailAuthSchema } from '@/schemas';
+import { ChangePasswordSchema, EmailAuthSchema, type ChangePassword } from '@/schemas';
 
 export function useRequestPasswordReset() {
   return useMutation({
@@ -42,5 +42,25 @@ export function useExchangeAuthCode(code: string | undefined) {
     retry: false,
     staleTime: Infinity,
     gcTime: Infinity,
+  });
+}
+
+/**
+ * Re-checks the current password before changing it, so an unlocked phone
+ * isn't enough to take over the account.
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (input: ChangePassword) => {
+      const { current, next } = ChangePasswordSchema.parse(input);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error('Not signed in');
+
+      const { error: checkError } = await supabase.auth.signInWithPassword({ email: user.email, password: current });
+      if (checkError) throw new Error('Your current password is incorrect');
+
+      const { error } = await supabase.auth.updateUser({ password: next });
+      if (error) throw error;
+    },
   });
 }
