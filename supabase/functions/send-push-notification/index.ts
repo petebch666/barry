@@ -20,7 +20,7 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
 
 Deno.serve(async (req) => {
-  if (!isServiceCall(req)) return forbidden();
+  if (!(await isServiceCall(req))) return forbidden();
 
   try {
     const payload: PushPayload = await req.json();

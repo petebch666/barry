@@ -8,7 +8,7 @@ import { recipientIds } from './recipients.ts';
 import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
-  if (!isServiceCall(req)) return forbidden();
+  if (!(await isServiceCall(req))) return forbidden();
 
   try {
     const { record, old_record } = await req.json();

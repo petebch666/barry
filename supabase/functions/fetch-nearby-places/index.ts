@@ -97,7 +97,7 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 }
 
 Deno.serve(async (req) => {
-  if (!isServiceCall(req)) return forbidden();
+  if (!(await isServiceCall(req))) return forbidden();
 
   try {
     const { record } = await req.json();

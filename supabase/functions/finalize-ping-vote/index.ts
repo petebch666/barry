@@ -13,7 +13,7 @@ import { cancelUnvotedPing, computeBarycenter, confirmWinner, pickWinner, type L
 import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
-  if (!isServiceCall(req)) return forbidden();
+  if (!(await isServiceCall(req))) return forbidden();
 
   try {
     const supabase = createServiceClient();
