@@ -8,6 +8,7 @@ import { useRsvps, useRsvpsRealtime, useMyRsvp, useUpsertRsvp } from '@/hooks/us
 import { usePlaces, usePlacesRealtime } from '@/hooks/usePlaces';
 import { useVotes, useVotesRealtime, useCastVote, useMyVote, useVoteCounts } from '@/hooks/useVotes';
 import { useSavePlace } from '@/hooks/useProfile';
+import { useMyPingOutcome } from '@/hooks/useFeedback';
 import { computeBarycenter, haversineMeters } from '@/utils/barycenter';
 import { openDirections } from '@/utils/openDirections';
 import { GlassCard } from '@/components/GlassCard';
@@ -34,6 +35,7 @@ export default function PingDetailScreen() {
   const { data: rsvps = [] } = useRsvps(pingId);
   const { data: places = [] } = usePlaces(pingId);
   const { data: myRsvp } = useMyRsvp(pingId);
+  const { data: myOutcome, isLoading: outcomeLoading } = useMyPingOutcome(pingId);
   const { data: myVote } = useMyVote(pingId);
   const voteCounts = useVoteCounts(pingId);
 
@@ -262,6 +264,29 @@ export default function PingDetailScreen() {
                     <Text style={styles.suggestBtnText}>Find more places →</Text>
                   )}
                 </TouchableOpacity>
+              )}
+
+              {isConfirmed && myRsvp?.status === 'in' && !outcomeLoading && (
+                myOutcome ? (
+                  <Text style={styles.outcomeThanks}>Thanks for rating this meetup {myOutcome === 'up' ? '👍' : '👎'}</Text>
+                ) : (
+                  <View style={styles.outcomeCard}>
+                    <Text style={styles.outcomeTitle}>How did choosing the place go?</Text>
+                    <View style={styles.outcomeRow}>
+                      {(['up', 'down'] as const).map((value) => (
+                        <TouchableOpacity
+                          key={value}
+                          style={styles.outcomeBtn}
+                          onPress={() => router.push(`/feedback?pingId=${pingId}&rating=${value}`)}
+                          accessibilityRole="button"
+                          accessibilityLabel={value === 'up' ? 'It went well' : 'It went badly'}
+                        >
+                          <Text style={styles.outcomeEmoji}>{value === 'up' ? '👍' : '👎'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )
               )}
 
               {isConfirmed && (
@@ -504,6 +529,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
   },
+  outcomeCard: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  outcomeTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  outcomeRow: { flexDirection: 'row', gap: 16 },
+  outcomeBtn: {
+    width: 64,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  outcomeEmoji: { fontSize: 24 },
+  outcomeThanks: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   suggestBtnText: { fontSize: 15, fontWeight: '500', color: colors.textSecondary },
   placeCard: { padding: 14, gap: 8 },
   placeCardConfirmed: { borderColor: colors.success },

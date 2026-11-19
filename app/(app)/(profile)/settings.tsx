@@ -127,6 +127,22 @@ export default function SettingsScreen() {
             </View>
           </GlassCard>
 
+          <Text style={[styles.sectionLabel, { marginTop: 28 }]}>BETA</Text>
+          <GlassCard style={styles.card}>
+            <TouchableOpacity
+              style={styles.destructiveRow}
+              onPress={() => router.push('/feedback')}
+              accessibilityRole="button"
+              accessibilityLabel="Send feedback"
+            >
+              <Text style={styles.settingLabel}>Send feedback</Text>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          </GlassCard>
+          <Text style={styles.destructiveHint}>
+            A bug, something confusing, an idea: it goes straight to the developer.
+          </Text>
+
           <Text style={[styles.sectionLabel, { marginTop: 28 }]}>ACCOUNT</Text>
           <GlassCard style={styles.card}>
             <TouchableOpacity

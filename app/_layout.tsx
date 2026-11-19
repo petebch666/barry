@@ -132,6 +132,7 @@ function AuthGate() {
       <Stack.Screen name="add-saved-place" options={{ presentation: 'modal' }} />
       <Stack.Screen name="join/[code]" />
       <Stack.Screen name="invite/[groupId]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="feedback" options={{ presentation: 'modal' }} />
     </Stack>
     </>
   );
