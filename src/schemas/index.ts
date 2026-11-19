@@ -185,6 +185,24 @@ export const EmailAuthSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+
+export const FeedbackRatingSchema = z.enum(['up', 'down']);
+
+export const SendFeedbackSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('general'),
+    message: z.string().trim().min(1, 'Write a few words first').max(1000),
+    rating: FeedbackRatingSchema.optional(),
+  }),
+  z.object({
+    kind: z.literal('ping_outcome'),
+    ping_id: z.string().uuid(),
+    rating: FeedbackRatingSchema,
+    message: z.string().trim().max(1000).optional(),
+  }),
+]);
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type Profile = z.infer<typeof ProfileSchema>;
@@ -208,3 +226,5 @@ export type PlaceRatingValue = z.infer<typeof PlaceRatingValueSchema>;
 export type PlaceRating = z.infer<typeof PlaceRatingSchema>;
 export type RatePlace = z.infer<typeof RatePlaceSchema>;
 export type EmailAuth = z.infer<typeof EmailAuthSchema>;
+export type FeedbackRating = z.infer<typeof FeedbackRatingSchema>;
+export type SendFeedback = z.infer<typeof SendFeedbackSchema>;
