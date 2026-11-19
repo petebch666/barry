@@ -10,13 +10,13 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.barry.app",
+      "bundleIdentifier": "com.barycenter.barry",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.barry.app",
+      "package": "com.barycenter.barry",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -55,6 +55,12 @@
         "projectId": "5f18a045-40f0-4aba-b69e-4ef7dd26ab43"
       }
     },
-    "owner": "petebch"
+    "owner": "petebch",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5f18a045-40f0-4aba-b69e-4ef7dd26ab43"
+    }
   }
 }

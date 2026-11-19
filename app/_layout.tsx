@@ -67,6 +67,9 @@ function AuthGate() {
   const segments = useSegments();
   const redirecting = useRef(false);
   const inAuthGroup = segments[0] === '(auth)';
+  // The reset link signs the user in before they choose the new password, so
+  // that screen must not bounce them into the app.
+  const onResetScreen = inAuthGroup && (segments as string[])[1] === 'reset-password';
 
   // Register push token whenever we have a signed-in user
   usePushTokenRegistration(session?.user?.id ?? null);
@@ -106,7 +109,7 @@ function AuthGate() {
       redirecting.current = true;
       router.replace('/(auth)');
       redirecting.current = false;
-    } else if (session && inAuthGroup) {
+    } else if (session && inAuthGroup && !onResetScreen) {
       redirecting.current = true;
       router.replace('/(app)/(feed)');
       redirecting.current = false;

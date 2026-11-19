@@ -14,6 +14,8 @@ import { showAlert } from '@/lib/alert';
 import { BlurView } from 'expo-blur';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import { useRouter } from 'expo-router';
+import { authRedirect } from '@/lib/authRedirect';
 import { supabase } from '@/lib/supabase';
 import { EmailAuthSchema } from '@/schemas';
 import { colors, radii } from '@/lib/theme';
@@ -25,6 +27,7 @@ type Mode = 'signin' | 'signup';
 
 export default function SignInScreen() {
   const [loading, setLoading] = useState<LoadingState>(null);
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,7 +81,10 @@ export default function SignInScreen() {
         const { error: signInError } = await supabase.auth.signInWithPassword(parsed.data);
         if (signInError) throw signInError;
       } else {
-        const { error: signUpError } = await supabase.auth.signUp(parsed.data);
+        const { error: signUpError } = await supabase.auth.signUp({
+          ...parsed.data,
+          options: { emailRedirectTo: authRedirect('auth/callback') },
+        });
         if (signUpError) throw signUpError;
         showAlert(
           'Check your email',
@@ -156,6 +162,15 @@ export default function SignInScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {mode === 'signin' && (
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: '/(auth)/forgot-password', params: { email } })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.toggleText}>Forgot password?</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(null); }}
