@@ -21,6 +21,7 @@
  * (deduped by external_id / proximity).
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
+import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 const SEARCH_RADIUS_M = 400;
 const MAX_PLACES = 8;
@@ -96,6 +97,8 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 }
 
 Deno.serve(async (req) => {
+  if (!isServiceCall(req)) return forbidden();
+
   try {
     const { record } = await req.json();
     const { id: pingId, status, places_batch: placesBatch } = record as {

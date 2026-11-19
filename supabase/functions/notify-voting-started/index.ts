@@ -3,8 +3,11 @@
  * Notifies all "in" RSVPs that place suggestions are ready to vote on.
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
+import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
+  if (!isServiceCall(req)) return forbidden();
+
   try {
     const { record } = await req.json();
     const { id: pingId, status, message } = record as {

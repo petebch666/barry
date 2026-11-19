@@ -107,3 +107,33 @@ Deno.test('buildBatches — missing data field defaults to empty object', () => 
   const batches = buildBatches({ tokens: ['tok-1'], title: 'T', body: 'B' });
   assertEquals(batches[0][0].data, {});
 });
+
+import { summarizeTickets } from './tickets.ts';
+
+Deno.test('summarizeTickets — all delivered', () => {
+  const s = summarizeTickets(['a', 'b'], [{ status: 'ok', id: '1' }, { status: 'ok', id: '2' }]);
+  assertEquals(s, { ok: 2, failed: 0, deadTokens: [], errors: [] });
+});
+
+Deno.test('summarizeTickets — DeviceNotRegistered marks the token dead, matched by position', () => {
+  const s = summarizeTickets(['a', 'b', 'c'], [
+    { status: 'ok' },
+    { status: 'error', message: 'gone', details: { error: 'DeviceNotRegistered' } },
+    { status: 'ok' },
+  ]);
+  assertEquals(s.deadTokens, ['b']);
+  assertEquals(s.failed, 1);
+  assertEquals(s.ok, 2);
+});
+
+Deno.test('summarizeTickets — other errors are reported but the token is kept', () => {
+  const s = summarizeTickets(['a'], [{ status: 'error', message: 'too big', details: { error: 'MessageTooBig' } }]);
+  assertEquals(s.deadTokens, []);
+  assertEquals(s.errors, [{ token: 'a', error: 'MessageTooBig', message: 'too big' }]);
+});
+
+Deno.test('summarizeTickets — an error without details is still counted', () => {
+  const s = summarizeTickets(['a'], [{ status: 'error' }]);
+  assertEquals(s.failed, 1);
+  assertEquals(s.errors[0].error, 'Unknown');
+});

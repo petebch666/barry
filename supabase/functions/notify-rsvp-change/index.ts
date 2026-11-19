@@ -8,6 +8,7 @@
  *    the new barycenter (deduplicated against existing ones by external_id).
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
+import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 const SHIFT_THRESHOLD_M = 1_000;
 const SEARCH_RADIUS_M = 800;
@@ -73,6 +74,8 @@ function haversineMeters(a: LatLng, b: LatLng): number {
 }
 
 Deno.serve(async (req) => {
+  if (!isServiceCall(req)) return forbidden();
+
   try {
     const { record, old_record } = await req.json();
 

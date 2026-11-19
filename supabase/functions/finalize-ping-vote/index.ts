@@ -10,8 +10,11 @@
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { cancelUnvotedPing, computeBarycenter, confirmWinner, pickWinner, type LatLng } from '../_shared/vote-decision.ts';
+import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  if (!isServiceCall(req)) return forbidden();
+
   try {
     const supabase = createServiceClient();
 
