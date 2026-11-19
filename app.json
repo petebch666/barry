@@ -10,7 +10,10 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.barry.app"
+      "bundleIdentifier": "com.barry.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.barry.app",
@@ -32,7 +35,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Barry needs your location to compute the meeting point with your friends."
+          "locationWhenInUsePermission": "Barry uses your location, only when you choose to share it in a ping, to find a meeting point with your friends."
         }
       ],
       [
