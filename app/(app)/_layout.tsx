@@ -2,7 +2,7 @@ import { StyleSheet, TouchableOpacity, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { ComponentProps } from 'react';
 import { colors } from '@/lib/theme';
 
 const TABS = [
@@ -11,7 +11,11 @@ const TABS = [
   { name: '(profile)', icon: '◌', label: 'Me' },
 ] as const;
 
-function GlassTabBar({ state, navigation }: BottomTabBarProps) {
+// expo-router no longer re-exports react-navigation's types (SDK 56), so the
+// props are read off Tabs' own tabBar prop.
+type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+function GlassTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const activeName = state.routes[state.index]?.name;
 
