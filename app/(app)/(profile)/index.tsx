@@ -10,6 +10,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { showAlert, confirmAction } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ import type { Group } from '@/schemas';
 export default function ProfileScreen() {
   const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: groups = [], isLoading: groupsLoading } = useGroups();
+  const { data: groups = [], isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
   const { data: savedPlaces = [], isLoading: placesLoading } = useSavedPlaces();
   const { mutateAsync: joinGroup, isPending: isJoining } = useJoinGroup();
   const { mutateAsync: updateProfile, isPending: isSavingName } = useUpdateProfile();
@@ -162,6 +163,8 @@ export default function ProfileScreen() {
 
           {groupsLoading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+          ) : groupsError && groups.length === 0 ? (
+            <LoadError what="your groups" onRetry={refetchGroups} />
           ) : groups.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
               <Text style={styles.emptyText}>No groups yet</Text>

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGroup, useGroupMembers } from '@/hooks/useGroups';
@@ -18,7 +19,7 @@ import type { Ping } from '@/schemas';
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: group, isLoading: groupLoading } = useGroup(id);
+  const { data: group, isLoading: groupLoading, isError: groupError, refetch: refetchGroup } = useGroup(id);
   const { data: members = [], isLoading: membersLoading } = useGroupMembers(id);
   const { data: pings = [], isLoading: pingsLoading } = useGroupPings(id);
 
@@ -39,9 +40,13 @@ export default function GroupDetailScreen() {
               <Text style={styles.backText}>‹ Back</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={styles.errorText}>Group not found</Text>
-          </View>
+          {groupError ? (
+            <LoadError what="this group" onRetry={refetchGroup} />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={styles.errorText}>Group not found</Text>
+            </View>
+          )}
         </SafeAreaView>
       </View>
     );

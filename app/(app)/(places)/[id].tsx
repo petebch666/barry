@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { showAlert, confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,16 +24,39 @@ export default function PlaceDetailScreen() {
   const { id: placeId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: profile } = useProfile();
-  const { data: places = [], isLoading } = useFavoritePlaces();
+  const { data: places = [], isLoading, isError, refetch } = useFavoritePlaces();
   const { mutateAsync: ratePlace } = useRatePlace();
   const { mutateAsync: deletePlace, isPending: isDeleting } = useDeleteSavedPlace();
 
   const place = places.find((p) => p.id === placeId);
 
-  if (isLoading || !place) {
+  if (isError && !place) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <LoadError what="this place" onRetry={refetch} />
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (isLoading) {
     return (
       <View style={styles.root}>
         <ActivityIndicator style={{ flex: 1 }} color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!place) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Text style={{ fontSize: 16, color: colors.textSecondary }}>This place no longer exists.</Text>
+          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button">
+            <Text style={{ fontSize: 16, color: colors.accent, fontWeight: '600' }}>‹ Back</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
       </View>
     );
   }

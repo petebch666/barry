@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import { colors, BARRY_HEADER_HEIGHT } from '@/lib/theme';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import { usePushTokenRegistration } from '@/hooks/usePushToken';
 import type { Session } from '@supabase/supabase-js';
+import { reportError } from '@/lib/reportError';
+import { ErrorScreen } from '@/components/ErrorScreen';
 
 // Show notifications as banners while the app is in the foreground
 Notifications.setNotificationHandler({
@@ -22,6 +24,13 @@ Notifications.setNotificationHandler({
 });
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => reportError(error, { queryKey: query.queryKey }),
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) =>
+      reportError(error, { mutationKey: mutation.options.mutationKey }),
+  }),
   defaultOptions: {
     queries: {
       staleTime: 1000 * 30,
@@ -29,6 +38,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Expo Router renders this instead of the app when anything below throws.
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ErrorScreen {...props} />;
+}
 
 export default function RootLayout() {
   return (
