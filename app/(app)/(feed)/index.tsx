@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFeedPings, useFeedPingsRealtime } from '@/hooks/usePings';
@@ -23,12 +24,14 @@ type FeedPing = Ping & {
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { data: pings, isLoading, refetch, isRefetching } = useFeedPings();
-  const { data: groups, isLoading: groupsLoading } = useGroups();
+  const { data: pings, isLoading, isError, refetch, isRefetching } = useFeedPings();
+  const { data: groups, isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
   useFeedPingsRealtime();
 
   const hasGroups = (groups?.length ?? 0) > 0;
-  const initialized = !isLoading && !groupsLoading;
+  // A failed groups load must not look like "no groups yet".
+  const loadFailed = (isError && !pings) || (groupsError && !groups);
+  const initialized = !isLoading && !groupsLoading && !loadFailed;
 
   return (
     <View style={styles.root}>
@@ -68,7 +71,9 @@ export default function FeedScreen() {
             }
             renderItem={({ item }) => <PingCard ping={item} />}
             ListEmptyComponent={
-              initialized ? (
+              loadFailed ? (
+                <LoadError what="your pings" onRetry={() => { refetch(); refetchGroups(); }} />
+              ) : initialized ? (
                 <View style={styles.empty}>
                   <Text style={styles.emptyText}>No pings yet</Text>
                   <Text style={styles.emptyHint}>

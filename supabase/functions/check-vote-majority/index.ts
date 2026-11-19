@@ -17,8 +17,11 @@
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { computeBarycenter, confirmWinner, hasMajority, pickWinner, shouldFinalizeVote, type LatLng } from '../_shared/vote-decision.ts';
+import { forbidden, isServiceCall } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
+  if (!(await isServiceCall(req))) return forbidden();
+
   try {
     const { record } = await req.json();
     const pingId = record?.ping_id as string;

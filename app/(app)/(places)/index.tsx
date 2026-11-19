@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl,
 } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFavoritePlaces, useRatePlace, type FavoritePlace } from '@/hooks/useFavoritePlaces';
@@ -25,7 +26,7 @@ function myRelationship(place: FavoritePlace, userId: string | undefined): Tab {
 export default function PlacesScreen() {
   const router = useRouter();
   const { data: profile } = useProfile();
-  const { data: places = [], isLoading, refetch, isRefetching } = useFavoritePlaces();
+  const { data: places = [], isLoading, isError, refetch, isRefetching } = useFavoritePlaces();
   const { mutateAsync: ratePlace } = useRatePlace();
   const [tab, setTab] = useState<Tab>('want_to_try');
 
@@ -82,6 +83,8 @@ export default function PlacesScreen() {
         >
           {isLoading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+          ) : isError && places.length === 0 ? (
+            <LoadError what="places" onRetry={refetch} />
           ) : filteredPlaces.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
               <Text style={styles.emptyText}>

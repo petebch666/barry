@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(72);
+SELECT plan(82);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -687,6 +687,96 @@ SELECT results_eq(
      WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000009' $$,
   ARRAY[true],
   'the coordinates are erased but the fact a location was shared stays'
+);
+
+-- ─── Test: edge function triggers (022) ─────────────────────
+-- Without Vault secrets the triggers skip (every test above ran that way).
+SELECT tests.authenticate_as_service_role();
+SELECT is_empty(
+  $$ SELECT 1 FROM net.http_request_queue $$,
+  'without Vault secrets, no edge function request is queued'
+);
+
+RESET ROLE;
+SELECT vault.create_secret('https://example.test', 'project_url');
+SELECT vault.create_secret('test-service-key', 'service_role_key');
+SELECT tests.authenticate_as_service_role();
+
+INSERT INTO pings (id, group_id, created_by, message)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000010', 'aaaaaaaa-0000-0000-0000-000000000001',
+        tests.get_supabase_uid('alice'), 'Trigger ping');
+SELECT results_eq(
+  $$ SELECT url, headers ->> 'Authorization', (convert_from(body, 'UTF8')::jsonb) #>> '{record,id}'
+     FROM net.http_request_queue ORDER BY id DESC LIMIT 1 $$,
+  $$ VALUES ('https://example.test/functions/v1/notify-group-on-ping', 'Bearer test-service-key',
+             'bbbbbbbb-0000-0000-0000-000000000010') $$,
+  'a new ping calls notify-group-on-ping with the service key and the row'
+);
+
+DELETE FROM net.http_request_queue;
+UPDATE pings SET status = 'voting' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000010';
+SELECT bag_eq(
+  $$ SELECT url FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/fetch-nearby-places'),
+            ('https://example.test/functions/v1/notify-voting-started') $$,
+  'voting starting fetches places and notifies'
+);
+
+DELETE FROM net.http_request_queue;
+UPDATE pings SET places_batch = places_batch + 1 WHERE id = 'bbbbbbbb-0000-0000-0000-000000000010';
+SELECT results_eq(
+  $$ SELECT url FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/fetch-nearby-places') $$,
+  'another round of places during voting fetches again but does not re-notify'
+);
+
+DELETE FROM net.http_request_queue;
+INSERT INTO rsvps (ping_id, user_id, status)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000010', tests.get_supabase_uid('bob'), 'in');
+INSERT INTO places (id, ping_id, name, latitude, longitude, source)
+VALUES ('eeeeeeee-0000-0000-0000-000000000010', 'bbbbbbbb-0000-0000-0000-000000000010', 'Bar', 48.86, 2.35, 'manual');
+INSERT INTO votes (ping_id, place_id, user_id)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000010', 'eeeeeeee-0000-0000-0000-000000000010', tests.get_supabase_uid('bob'));
+SELECT results_eq(
+  $$ SELECT url FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/check-vote-majority') $$,
+  'a vote checks for a majority'
+);
+
+DELETE FROM net.http_request_queue;
+UPDATE rsvps SET status = 'out'
+WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_supabase_uid('bob');
+SELECT results_eq(
+  $$ SELECT url, (convert_from(body, 'UTF8')::jsonb) #>> '{old_record,status}' FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/notify-rsvp-change', 'in') $$,
+  'dropping out of a ping calls notify-rsvp-change with the old status'
+);
+
+DELETE FROM net.http_request_queue;
+UPDATE rsvps SET status = 'maybe'
+WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_supabase_uid('bob');
+SELECT is_empty(
+  $$ SELECT 1 FROM net.http_request_queue $$,
+  'other RSVP changes call nothing'
+);
+
+UPDATE pings SET status = 'cancelled' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000010';
+SELECT results_eq(
+  $$ SELECT url FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/notify-ping-cancelled') $$,
+  'cancelling a ping notifies, and does not fetch places'
+);
+
+DELETE FROM net.http_request_queue;
+UPDATE pings SET message = 'Edited' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000010';
+SELECT is_empty(
+  $$ SELECT 1 FROM net.http_request_queue $$,
+  'unrelated ping updates call nothing'
+);
+
+SELECT ok(
+  NOT has_function_privilege('authenticated', 'call_edge_function()', 'EXECUTE'),
+  'clients cannot call the trigger function'
 );
 
 SELECT * FROM finish();

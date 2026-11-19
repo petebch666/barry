@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,7 +32,7 @@ export default function PingDetailScreen() {
   const { id: pingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const { data: ping, isLoading } = usePing(pingId);
+  const { data: ping, isLoading, isError, refetch } = usePing(pingId);
   const { data: rsvps = [] } = useRsvps(pingId);
   const { data: places = [] } = usePlaces(pingId);
   const { data: myRsvp } = useMyRsvp(pingId);
@@ -78,10 +79,31 @@ export default function PingDetailScreen() {
   const { mutateAsync: savePlace } = useSavePlace();
   const { mutateAsync: upsertRsvp } = useUpsertRsvp();
 
-  if (isLoading || !ping) {
+  if (isLoading) {
     return (
       <View style={styles.root}>
         <ActivityIndicator style={{ flex: 1 }} color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!ping) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={styles.navBar}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
+              <Text style={styles.backText}>‹ Back</Text>
+            </TouchableOpacity>
+          </View>
+          {isError ? (
+            <LoadError what="this ping" onRetry={refetch} />
+          ) : (
+            <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>
+              This ping no longer exists.
+            </Text>
+          )}
+        </SafeAreaView>
       </View>
     );
   }

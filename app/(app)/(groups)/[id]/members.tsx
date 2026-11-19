@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { LoadError } from '@/components/LoadError';
 import { showAlert, confirmAction } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ export default function MembersScreen() {
   const router = useRouter();
 
   const { data: profile } = useProfile();
-  const { data: members = [], isLoading } = useGroupMembers(id);
+  const { data: members = [], isLoading, isError, refetch } = useGroupMembers(id);
   const { mutateAsync: updateRole, isPending: updatingRole } = useUpdateMemberRole(id);
   const { mutateAsync: removeMember, isPending: removing } = useRemoveMember(id);
 
@@ -110,6 +111,8 @@ export default function MembersScreen() {
 
         {isLoading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+        ) : isError && members.length === 0 ? (
+          <LoadError what="members" onRetry={refetch} />
         ) : (
           <FlatList
             data={typedMembers}
