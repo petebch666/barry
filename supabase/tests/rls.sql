@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(82);
+SELECT plan(92);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -777,6 +777,63 @@ SELECT is_empty(
 SELECT ok(
   NOT has_function_privilege('authenticated', 'call_edge_function()', 'EXECUTE'),
   'clients cannot call the trigger function'
+);
+
+-- ─── Test: admin accounts (023) ─────────────────────────────
+RESET ROLE;
+CREATE TEMP TABLE new_tester ON COMMIT DROP AS
+  SELECT * FROM admin.create_user('  Ana.Tester@Example.org ', 'Ana');
+
+SELECT results_eq(
+  $$ SELECT email FROM new_tester $$,
+  ARRAY['ana.tester@example.org'],
+  'create_user normalises the email'
+);
+SELECT ok(
+  (SELECT char_length(password) = 12 AND password ~ '^[a-km-np-zA-HJ-NP-Z2-9]+$' FROM new_tester),
+  'create_user generates a 12-character password without look-alike characters'
+);
+SELECT ok(
+  (SELECT u.email_confirmed_at IS NOT NULL AND u.encrypted_password = extensions.crypt(t.password, u.encrypted_password)
+   FROM auth.users u JOIN new_tester t ON t.user_id = u.id),
+  'the account is confirmed and signs in with the returned password'
+);
+SELECT results_eq(
+  $$ SELECT p.display_name FROM profiles p JOIN new_tester t ON t.user_id = p.id $$,
+  ARRAY['Ana'],
+  'the profile gets the display name'
+);
+SELECT results_eq(
+  $$ SELECT count(*)::int FROM auth.identities i JOIN new_tester t ON t.user_id = i.user_id WHERE i.provider = 'email' $$,
+  ARRAY[1],
+  'the account has an email identity, needed for password sign-in'
+);
+SELECT throws_ok(
+  $$ SELECT * FROM admin.create_user('ana.tester@example.org', 'Ana again') $$,
+  'P0001', 'an account already exists for ana.tester@example.org',
+  'create_user refuses an existing email'
+);
+SELECT throws_ok(
+  $$ SELECT * FROM admin.create_user('bea@example.org', 'Bea', 'short') $$,
+  'P0001', 'password must be at least 8 characters',
+  'create_user refuses a short password'
+);
+SELECT * FROM admin.set_password('ana.tester@example.org', 'a-new-password');
+SELECT ok(
+  (SELECT encrypted_password = extensions.crypt('a-new-password', encrypted_password)
+   FROM auth.users WHERE email = 'ana.tester@example.org'),
+  'set_password changes the password'
+);
+SELECT throws_ok(
+  $$ SELECT * FROM admin.set_password('nobody@example.org') $$,
+  'P0001', 'no account for nobody@example.org',
+  'set_password refuses an unknown email'
+);
+SELECT ok(
+  NOT has_schema_privilege('authenticated', 'admin', 'USAGE')
+  AND NOT has_schema_privilege('anon', 'admin', 'USAGE')
+  AND NOT has_schema_privilege('service_role', 'admin', 'USAGE'),
+  'no client role can reach the admin schema'
 );
 
 SELECT * FROM finish();
