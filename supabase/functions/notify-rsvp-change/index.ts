@@ -5,57 +5,17 @@
  * 1. Recomputes the barycenter without the departing member.
  * 2. If the shift exceeds 1 km, notifies remaining 'in' members.
  * 3. If the ping is in 'voting' state, inserts additional OSM places at
- *    the new barycenter (deduplicated against existing ones by external_id).
+ *    the new barycenter (Overpass, falling back to Nominatim), deduplicated
+ *    against existing ones by external_id.
  */
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { forbidden, isServiceCall } from '../_shared/auth.ts';
+import { findVenues, type LatLng } from '../_shared/osm.ts';
 
 const SHIFT_THRESHOLD_M = 1_000;
 const SEARCH_RADIUS_M = 800;
 const MAX_NEW_PLACES = 4;
 const OVERPASS_RESULT_LIMIT = 15;
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const OVERPASS_TIMEOUT_MS = 15_000;
-const RETRY_BACKOFF_MS = 1_500;
-const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
-
-// Bounds the Overpass call so a slow/rate-limited response can't eat the
-// function's whole wall-clock budget — see the same guard in
-// fetch-nearby-places/index.ts for the production incident that motivated this.
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// One retry after a short backoff for transient failures (timeout/network
-// error, or a 429/502/503/504) — see fetch-nearby-places/index.ts for the
-// same pattern and the production incident that motivated it.
-async function fetchOverpassWithRetry(url: string, options: RequestInit): Promise<Response> {
-  try {
-    const res = await fetchWithTimeout(url, options, OVERPASS_TIMEOUT_MS);
-    if (res.ok || !RETRYABLE_STATUSES.has(res.status)) return res;
-    console.warn(`Overpass mirror ${url} returned ${res.status}, retrying once`);
-  } catch (err) {
-    console.warn(`Overpass mirror ${url} failed or timed out, retrying once:`, err);
-  }
-  await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
-  return await fetchWithTimeout(url, options, OVERPASS_TIMEOUT_MS);
-}
-
-interface LatLng { latitude: number; longitude: number; }
-interface OsmElement {
-  type: 'node' | 'way';
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: Record<string, string>;
-}
 
 function computeBarycenter(points: LatLng[]): LatLng | null {
   if (!points.length) return null;
@@ -170,81 +130,37 @@ Deno.serve(async (req) => {
     // ── Add new OSM places at the new barycenter (voting state only) ──────
     let inserted = 0;
     if (ping.status === 'voting') {
-      try {
-        const query = [
-          '[out:json][timeout:10];',
-          '(',
-          `  node["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
-          `  way["amenity"~"^(restaurant|bar)$"](around:${SEARCH_RADIUS_M},${newBarycenter.latitude},${newBarycenter.longitude});`,
-          ');',
-          `out body center ${OVERPASS_RESULT_LIMIT};`,
-        ].join('\n');
+      const { candidates } = await findVenues(newBarycenter, SEARCH_RADIUS_M, OVERPASS_RESULT_LIMIT);
+      const { data: existing } = await supabase
+        .from('places')
+        .select('external_id')
+        .eq('ping_id', ping.id);
+      const existingIds = new Set(
+        (existing ?? []).map((p: { external_id: string | null }) => p.external_id).filter(Boolean),
+      );
 
-        const res = await fetchOverpassWithRetry(OVERPASS_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'BarryApp/1.0',
-          },
-          body: `data=${encodeURIComponent(query)}`,
-        });
+      const newPlaces = candidates
+        .filter((c) => !existingIds.has(c.externalId))
+        .sort((x, y) => haversineMeters(newBarycenter, x) - haversineMeters(newBarycenter, y))
+        .slice(0, MAX_NEW_PLACES)
+        .map((c) => ({
+          ping_id: ping.id,
+          name: c.name,
+          address: c.address,
+          latitude: c.latitude,
+          longitude: c.longitude,
+          category: c.category,
+          source: 'osm',
+          external_id: c.externalId,
+          photo_url: null,
+          rating: null,
+          suggested_by: null,
+        }));
 
-        if (res.ok) {
-          const { elements = [] } = await res.json() as { elements: OsmElement[] };
-
-          // Deduplicate against places already in this ping
-          const { data: existing } = await supabase
-            .from('places')
-            .select('external_id')
-            .eq('ping_id', ping.id);
-
-          const existingIds = new Set(
-            (existing ?? []).map((p: { external_id: string | null }) => p.external_id).filter(Boolean),
-          );
-
-          const newPlaces: Record<string, unknown>[] = [];
-
-          for (const element of elements) {
-            if (newPlaces.length >= MAX_NEW_PLACES) break;
-
-            const lat = element.type === 'node' ? element.lat : element.center?.lat;
-            const lon = element.type === 'node' ? element.lon : element.center?.lon;
-            const tags = element.tags ?? {};
-            if (!lat || !lon || !tags.name) continue;
-
-            const extId = `${element.type}/${element.id}`;
-            if (existingIds.has(extId)) continue;
-
-            const addrParts: string[] = [];
-            if (tags['addr:housenumber'] && tags['addr:street']) {
-              addrParts.push(`${tags['addr:housenumber']} ${tags['addr:street']}`);
-            } else if (tags['addr:street']) {
-              addrParts.push(tags['addr:street']);
-            }
-            if (tags['addr:city']) addrParts.push(tags['addr:city']);
-
-            newPlaces.push({
-              ping_id: ping.id,
-              name: tags.name,
-              address: addrParts.join(', ') || null,
-              latitude: lat,
-              longitude: lon,
-              category: tags.amenity ?? null,
-              source: 'osm',
-              external_id: extId,
-              photo_url: null,
-              rating: null,
-              suggested_by: null,
-            });
-          }
-
-          if (newPlaces.length) {
-            const { error } = await supabase.from('places').insert(newPlaces);
-            if (!error) inserted = newPlaces.length;
-          }
-        }
-      } catch (overpassErr) {
-        console.error('Overpass error in notify-rsvp-change:', overpassErr);
+      if (newPlaces.length) {
+        const { error } = await supabase.from('places').insert(newPlaces);
+        if (error) console.error('Could not insert new places:', error.message);
+        else inserted = newPlaces.length;
       }
     }
 
