@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(92);
+SELECT plan(95);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -834,6 +834,25 @@ SELECT ok(
   AND NOT has_schema_privilege('anon', 'admin', 'USAGE')
   AND NOT has_schema_privilege('service_role', 'admin', 'USAGE'),
   'no client role can reach the admin schema'
+);
+
+-- ─── Test: server-side invite codes (024) ───────────────────
+SELECT tests.authenticate_as('alice');
+INSERT INTO groups (id, name, created_by)
+VALUES ('aaaaaaaa-0000-0000-0000-000000000024', 'No code sent', auth.uid());
+SELECT tests.authenticate_as_service_role();
+SELECT ok(
+  (SELECT invite_code ~ '^[0-9A-F]{8}$' FROM groups WHERE id = 'aaaaaaaa-0000-0000-0000-000000000024'),
+  'a group created without an invite code gets an 8-character uppercase hex one'
+);
+SELECT is(
+  (SELECT count(DISTINCT c) FROM (SELECT generate_invite_code() AS c FROM generate_series(1, 200)) s),
+  200::bigint,
+  'generated codes do not repeat'
+);
+SELECT ok(
+  NOT has_function_privilege('anon', 'generate_invite_code()', 'EXECUTE'),
+  'signed-out callers cannot generate codes'
 );
 
 SELECT * FROM finish();

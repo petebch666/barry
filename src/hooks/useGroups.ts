@@ -52,16 +52,10 @@ export function useCreateGroup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Generate a short unique invite code server-side
-      const inviteCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-        .toUpperCase()
-        .slice(0, 8);
-
+      // invite_code comes from the column default (024): Hermes has no crypto.
       const { data: group, error: groupError } = await supabase
         .from('groups')
-        .insert({ ...input, created_by: user.id, invite_code: inviteCode })
+        .insert({ ...input, created_by: user.id })
         .select()
         .single();
 

@@ -142,7 +142,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          invite_code: string
+          invite_code?: string
           name: string
         }
         Update: {
@@ -547,6 +547,7 @@ export type Database = {
       cancel_expired_pings: { Args: never; Returns: undefined }
       delete_user: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
+      generate_invite_code: { Args: never; Returns: string }
       is_group_admin: { Args: { gid: string }; Returns: boolean }
       is_group_member: { Args: { gid: string }; Returns: boolean }
       lookup_group_by_invite_code: {
