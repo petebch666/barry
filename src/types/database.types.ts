@@ -39,6 +39,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          id: string
+          kind: string
+          message: string | null
+          ping_id: string | null
+          platform: string | null
+          rating: string | null
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          message?: string | null
+          ping_id?: string | null
+          platform?: string | null
+          rating?: string | null
+          user_id?: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string | null
+          ping_id?: string | null
+          platform?: string | null
+          rating?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_ping_id_fkey"
+            columns: ["ping_id"]
+            isOneToOne: false
+            referencedRelation: "pings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           group_id: string
@@ -118,6 +169,7 @@ export type Database = {
           confirmed_place_id: string | null
           created_at: string
           created_by: string | null
+          decided_at: string | null
           expires_at: string
           group_id: string
           id: string
@@ -132,6 +184,7 @@ export type Database = {
           confirmed_place_id?: string | null
           created_at?: string
           created_by?: string | null
+          decided_at?: string | null
           expires_at?: string
           group_id: string
           id?: string
@@ -146,6 +199,7 @@ export type Database = {
           confirmed_place_id?: string | null
           created_at?: string
           created_by?: string | null
+          decided_at?: string | null
           expires_at?: string
           group_id?: string
           id?: string
@@ -351,6 +405,7 @@ export type Database = {
           location_updated_at: string | null
           longitude: number | null
           ping_id: string
+          shared_location: boolean
           status: string
           updated_at: string
           user_id: string
@@ -361,6 +416,7 @@ export type Database = {
           location_updated_at?: string | null
           longitude?: number | null
           ping_id: string
+          shared_location?: boolean
           status: string
           updated_at?: string
           user_id: string
@@ -371,6 +427,7 @@ export type Database = {
           location_updated_at?: string | null
           longitude?: number | null
           ping_id?: string
+          shared_location?: boolean
           status?: string
           updated_at?: string
           user_id?: string
@@ -507,6 +564,7 @@ export type Database = {
           confirmed_place_id: string | null
           created_at: string
           created_by: string | null
+          decided_at: string | null
           expires_at: string
           group_id: string
           id: string
@@ -531,6 +589,7 @@ export type Database = {
           confirmed_place_id: string | null
           created_at: string
           created_by: string | null
+          decided_at: string | null
           expires_at: string
           group_id: string
           id: string
