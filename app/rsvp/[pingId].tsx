@@ -202,7 +202,8 @@ export default function RsvpModal() {
       <Modal
         visible={showMapModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        // Not pageSheet: its swipe-to-close gesture fights pans on the map.
+        presentationStyle="fullScreen"
         onRequestClose={dismissMapModal}
       >
         <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>

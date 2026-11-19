@@ -176,7 +176,8 @@ export default function PingDetailScreen() {
                 Your answer:{' '}
                 <Text style={styles.myRsvpValue}>{myRsvp.status}</Text>
               </Text>
-              {ping.status === 'open' && (
+              {/* Also during voting: someone who left must be able to come back. */}
+              {isActive && (
                 <TouchableOpacity onPress={() => router.push(`/rsvp/${pingId}`)}>
                   <Text style={styles.changeLink}>Change</Text>
                 </TouchableOpacity>

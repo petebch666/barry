@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(95);
+SELECT plan(96);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -737,29 +737,41 @@ INSERT INTO places (id, ping_id, name, latitude, longitude, source)
 VALUES ('eeeeeeee-0000-0000-0000-000000000010', 'bbbbbbbb-0000-0000-0000-000000000010', 'Bar', 48.86, 2.35, 'manual');
 INSERT INTO votes (ping_id, place_id, user_id)
 VALUES ('bbbbbbbb-0000-0000-0000-000000000010', 'eeeeeeee-0000-0000-0000-000000000010', tests.get_supabase_uid('bob'));
-SELECT results_eq(
+SELECT bag_eq(
   $$ SELECT url FROM net.http_request_queue $$,
-  $$ VALUES ('https://example.test/functions/v1/check-vote-majority') $$,
-  'a vote checks for a majority'
+  $$ VALUES ('https://example.test/functions/v1/notify-pinger'),
+            ('https://example.test/functions/v1/check-vote-majority') $$,
+  'an answer tells the pinger (025), and a vote checks for a majority'
 );
 
 DELETE FROM net.http_request_queue;
 UPDATE rsvps SET status = 'out'
 WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_supabase_uid('bob');
-SELECT results_eq(
+SELECT bag_eq(
   $$ SELECT url, (convert_from(body, 'UTF8')::jsonb) #>> '{old_record,status}' FROM net.http_request_queue $$,
-  $$ VALUES ('https://example.test/functions/v1/notify-rsvp-change', 'in') $$,
-  'dropping out of a ping calls notify-rsvp-change with the old status'
+  $$ VALUES ('https://example.test/functions/v1/notify-rsvp-change', 'in'),
+            ('https://example.test/functions/v1/notify-pinger', 'in') $$,
+  'dropping out of a ping recomputes the meeting point and tells the pinger'
 );
 
 DELETE FROM net.http_request_queue;
 UPDATE rsvps SET status = 'maybe'
 WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_supabase_uid('bob');
-SELECT is_empty(
-  $$ SELECT 1 FROM net.http_request_queue $$,
-  'other RSVP changes call nothing'
+SELECT results_eq(
+  $$ SELECT url FROM net.http_request_queue $$,
+  $$ VALUES ('https://example.test/functions/v1/notify-pinger') $$,
+  'other answer changes only tell the pinger'
 );
 
+DELETE FROM net.http_request_queue;
+UPDATE rsvps SET latitude = 48.87, longitude = 2.36
+WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_supabase_uid('bob');
+SELECT is_empty(
+  $$ SELECT 1 FROM net.http_request_queue $$,
+  'a location-only change tells nobody'
+);
+
+DELETE FROM net.http_request_queue;
 UPDATE pings SET status = 'cancelled' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000010';
 SELECT results_eq(
   $$ SELECT url FROM net.http_request_queue $$,
