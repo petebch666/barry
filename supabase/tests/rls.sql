@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(60);
+SELECT plan(72);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -611,6 +611,82 @@ SELECT ok(
 SELECT ok(
   has_function_privilege('anon', 'is_group_member(uuid)', 'EXECUTE'),
   'RLS helpers stay callable so anon queries return nothing instead of erroring'
+);
+
+-- ─── Test: feedback (020) ───────────────────────────────────
+SELECT tests.authenticate_as('bob');
+SELECT lives_ok(
+  $$ INSERT INTO feedback (kind, message, platform) VALUES ('general', 'Love it', 'web') $$,
+  'a member can send general feedback'
+);
+SELECT lives_ok(
+  $$ INSERT INTO feedback (kind, rating, ping_id) VALUES ('ping_outcome', 'up', 'bbbbbbbb-0000-0000-0000-000000000001') $$,
+  'a member can rate a ping in their group'
+);
+SELECT throws_ok(
+  $$ INSERT INTO feedback (kind, rating, ping_id) VALUES ('ping_outcome', 'down', 'bbbbbbbb-0000-0000-0000-000000000001') $$,
+  '23505', NULL,
+  'one outcome rating per person per ping'
+);
+SELECT throws_ok(
+  $$ INSERT INTO feedback (kind, ping_id) VALUES ('ping_outcome', 'bbbbbbbb-0000-0000-0000-000000000001') $$,
+  '23514', NULL,
+  'an outcome rating needs a rating'
+);
+SELECT throws_ok(
+  $$ INSERT INTO feedback (kind, message) VALUES ('general', '   ') $$,
+  '23514', NULL,
+  'empty feedback is rejected'
+);
+SELECT throws_ok(
+  format($$ INSERT INTO feedback (user_id, kind, message) VALUES (%L, 'general', 'x') $$, tests.get_supabase_uid('alice')),
+  '42501', NULL,
+  'feedback cannot be sent in someone else''s name'
+);
+SELECT results_eq(
+  $$ SELECT jsonb_array_length(export_my_data() -> 'feedback') $$,
+  ARRAY[2],
+  'the export includes the caller''s feedback'
+);
+
+SELECT tests.authenticate_as('dave');
+SELECT throws_ok(
+  $$ INSERT INTO feedback (kind, rating, ping_id) VALUES ('ping_outcome', 'up', 'bbbbbbbb-0000-0000-0000-000000000001') $$,
+  '42501', NULL,
+  'feedback cannot be attached to a ping outside your groups'
+);
+
+SELECT tests.authenticate_as('alice');
+SELECT is_empty(
+  $$ SELECT 1 FROM feedback WHERE user_id = tests.get_supabase_uid('bob') $$,
+  'members cannot read each other''s feedback'
+);
+
+-- ─── Test: beta metrics (021) ───────────────────────────────
+SELECT throws_ok(
+  $$ SELECT * FROM beta.ping_funnel $$,
+  '42501', NULL,
+  'signed-in users cannot read the beta metrics'
+);
+
+SELECT tests.authenticate_as_service_role();
+INSERT INTO pings (id, group_id, created_by, message)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000001',
+        tests.get_supabase_uid('alice'), 'Metrics ping');
+INSERT INTO rsvps (ping_id, user_id, status, latitude, longitude)
+VALUES ('bbbbbbbb-0000-0000-0000-000000000009', tests.get_supabase_uid('bob'), 'in', 48.86, 2.35);
+UPDATE pings SET status = 'cancelled' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000009';
+SELECT nullify_terminal_ping_locations();
+SELECT results_eq(
+  $$ SELECT decided_at IS NOT NULL FROM pings WHERE id = 'bbbbbbbb-0000-0000-0000-000000000009' $$,
+  ARRAY[true],
+  'a cancelled ping records when it was decided'
+);
+SELECT results_eq(
+  $$ SELECT latitude IS NULL AND shared_location FROM rsvps
+     WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000009' $$,
+  ARRAY[true],
+  'the coordinates are erased but the fact a location was shared stays'
 );
 
 SELECT * FROM finish();
