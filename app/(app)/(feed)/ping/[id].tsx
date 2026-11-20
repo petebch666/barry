@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LoadError } from '@/components/LoadError';
-import { confirmAction } from '@/lib/alert';
+import { confirmAction, showAlert } from '@/lib/alert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePing, usePingRealtime, useStartVoting, useCancelPing, useRequestMorePlaces } from '@/hooks/usePings';
@@ -132,7 +132,14 @@ export default function PingDetailScreen() {
       cancelText: 'Stay',
       destructive: true,
     });
-    if (ok) upsertRsvp({ ping_id: pingId, status: 'out', location: null });
+    if (!ok) return;
+    try {
+      await upsertRsvp({ ping_id: pingId, status: 'out', location: null });
+      router.replace('/(app)/(feed)');
+      showAlert('You left this ping', `You're out of “${ping!.message}”. You can rejoin anytime from the feed.`);
+    } catch (err) {
+      showAlert('Error', err instanceof Error ? err.message : 'Could not leave the ping.');
+    }
   }
 
   return (
@@ -176,12 +183,26 @@ export default function PingDetailScreen() {
                 Your answer:{' '}
                 <Text style={styles.myRsvpValue}>{myRsvp.status}</Text>
               </Text>
-              {/* Also during voting: someone who left must be able to come back. */}
-              {isActive && (
+              {/* Also during voting; "out" gets the rejoin banner below instead. */}
+              {isActive && myRsvp.status !== 'out' && (
                 <TouchableOpacity onPress={() => router.push(`/rsvp/${pingId}`)}>
                   <Text style={styles.changeLink}>Change</Text>
                 </TouchableOpacity>
               )}
+            </View>
+          )}
+
+          {myRsvp?.status === 'out' && isActive && (
+            <View style={styles.outBanner}>
+              <Text style={styles.outTitle}>You're out of this ping</Text>
+              <Text style={styles.outHint}>
+                {ping.status === 'voting' ? 'Rejoin to vote on a place.' : 'Changed your mind? You can still join.'}
+              </Text>
+              <GlassButton
+                label="I'm in after all →"
+                onPress={() => router.push(`/rsvp/${pingId}`)}
+                accessibilityLabel="Rejoin this ping"
+              />
             </View>
           )}
 
@@ -244,6 +265,8 @@ export default function PingDetailScreen() {
                   myVotePlaceId={myVote}
                   barycenter={barycenter}
                   isConfirmed={isConfirmed && ping.confirmed_place_id === place.id}
+                  // Votes are for people who are coming (RLS enforces it too).
+                  canVote={myRsvp?.status === 'in'}
                   onVote={async () => {
                     if (ping.status !== 'voting') return;
                     await castVote({ ping_id: pingId, place_id: place.id });
@@ -398,7 +421,7 @@ export default function PingDetailScreen() {
 }
 
 function PlaceCard({
-  place, votes, totalIn, myVotePlaceId, barycenter, isConfirmed, onVote, isCasting, onSave,
+  place, votes, totalIn, myVotePlaceId, barycenter, isConfirmed, canVote, onVote, isCasting, onSave,
 }: {
   place: Place;
   votes: number;
@@ -406,6 +429,7 @@ function PlaceCard({
   myVotePlaceId: string | null | undefined;
   barycenter: { latitude: number; longitude: number } | null;
   isConfirmed: boolean;
+  canVote: boolean;
   onVote: () => void;
   isCasting: boolean;
   onSave: () => Promise<void>;
@@ -454,7 +478,7 @@ function PlaceCard({
           </View>
         </View>
 
-        {!isConfirmed && (
+        {!isConfirmed && canVote && (
           <TouchableOpacity
             style={[styles.voteBtn, isMyVote && styles.voteBtnActive]}
             onPress={onVote}
@@ -552,6 +576,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
   },
+  outBanner: {
+    gap: 8,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  outTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  outHint: { fontSize: 14, color: colors.textSecondary },
   outcomeCard: {
     alignItems: 'center',
     gap: 10,

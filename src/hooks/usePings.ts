@@ -26,7 +26,11 @@ export function useFeedPings() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as (Ping & { groups: { id: string; name: string }; places: FeedPlace | null })[];
+      return data as (Ping & {
+        groups: { id: string; name: string };
+        places: FeedPlace | null;
+        rsvps: { id: string; user_id: string; status: 'in' | 'out' | 'maybe' }[];
+      })[];
     },
   });
 }

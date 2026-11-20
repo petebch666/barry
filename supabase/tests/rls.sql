@@ -3,7 +3,7 @@
 -- Requires: local Supabase stack running (npx supabase start)
 
 BEGIN;
-SELECT plan(96);
+SELECT plan(97);
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -750,8 +750,14 @@ WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010' AND user_id = tests.get_s
 SELECT bag_eq(
   $$ SELECT url, (convert_from(body, 'UTF8')::jsonb) #>> '{old_record,status}' FROM net.http_request_queue $$,
   $$ VALUES ('https://example.test/functions/v1/notify-rsvp-change', 'in'),
-            ('https://example.test/functions/v1/notify-pinger', 'in') $$,
-  'dropping out of a ping recomputes the meeting point and tells the pinger'
+            ('https://example.test/functions/v1/notify-pinger', 'in'),
+            ('https://example.test/functions/v1/check-vote-majority', 'in') $$,
+  'dropping out recomputes the meeting point, tells the pinger and re-checks the majority (026)'
+);
+SELECT is_empty(
+  $$ SELECT 1 FROM votes WHERE ping_id = 'bbbbbbbb-0000-0000-0000-000000000010'
+       AND user_id = tests.get_supabase_uid('bob') $$,
+  'dropping out removes the leaver''s vote (026)'
 );
 
 DELETE FROM net.http_request_queue;
