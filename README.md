@@ -13,7 +13,7 @@ Beyond meetups, Barry is also about **recommending your favorite places to your 
 1. **Ping** — send a ping to one of your groups with a message, an optional proposed time, and an optional **vote timer** (15m/30m/1h/2h)
 2. **RSVP** — members respond in/out/maybe; "in" members can optionally share their current location
 3. **Barycenter** — the app computes the arithmetic mean of all "in" members' locations
-4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter via Overpass API, no API key required) + members' personal saved places are merged into a candidate list. Each Overpass mirror gets one retry after a short backoff on a transient failure (timeout, 429/502/503/504) before falling through to the next, since the free public mirrors occasionally get overloaded. If the first 8 don't satisfy the group, any "in" member can tap **"Find more places"** for another round (up to 3 rounds total)
+4. **Venue suggestions** — OpenStreetMap `restaurant`/`bar` venues (400 m radius from barycenter) + members' personal saved places are merged into a candidate list. Venues come from Geoapify (a hosted OSM provider, server-side key), falling back to the public Overpass and Nominatim services, which block Supabase's servers but are kept in case Geoapify is down. If the first 8 don't satisfy the group, any "in" member can tap **"Find more places"** for another round (up to 3 rounds total)
 5. **Vote** — members vote for their preferred venue; any member can also suggest an additional place
 6. **Confirm** —
    - **No vote timer set:** as soon as >50% of "in" members vote for the same venue, the meetup is confirmed.
@@ -44,7 +44,7 @@ The **"Suggest a place"** flow during voting can pull directly from a group's sh
 | Backend | Supabase (PostgreSQL + Realtime + Edge Functions) |
 | Auth | Apple Sign In + Email/Password via Supabase |
 | Maps | react-native-webview (native) / iframe (web) + Leaflet.js + OpenStreetMap tiles |
-| Places | OpenStreetMap Overpass API (server-side, no API key required) |
+| Places | OpenStreetMap data via Geoapify (server-side key), Overpass/Nominatim fallback |
 | Address autocomplete | Base Adresse Nationale (BAN) — France, free, no API key |
 | Location | expo-location (foreground, per-ping opt-in) |
 | Push | expo-notifications + Expo Push API |
@@ -300,7 +300,7 @@ Covers RLS policies plus the `start_ping_voting` RPC (timer deadline stamping, i
 
 - **No service role key on the client** — ever. It lives only in Edge Function environment variables.
 - **RLS on every table** — no exceptions. The `is_group_member(gid)` SECURITY DEFINER helper keeps policy definitions concise.
-- **No third-party API key for places** — venue data comes from OpenStreetMap via the Overpass API, which is free and requires no key.
+- **OpenStreetMap only for places** — venue data comes from OSM via Geoapify; its key lives only in Edge Function secrets.
 - **Location data** is optional per ping. A pg_cron job nullifies `rsvps.latitude` / `rsvps.longitude` when a ping reaches a terminal state (confirmed or cancelled).
 - **PKCE flow** is used for all OAuth — authorization codes cannot be intercepted without the code verifier.
 - **Push tokens** are deleted from `push_tokens` on sign-out and re-registered fresh on next sign-in.

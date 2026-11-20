@@ -1,10 +1,13 @@
-// Venue lookup around the meeting point, from OpenStreetMap only (no Google).
+// Venue lookup around the meeting point, from OpenStreetMap data only (no
+// Google).
 //
-// Overpass is the richer source but its public servers are often saturated:
-// in production every mirror answered 406/429/502/504 or timed out, and a
-// successful query took 30–35 s. So: one Overpass attempt with a bounded
-// wait, then Nominatim's amenity search, which answers in about a second.
-// Both return OSM ids, so `node/123` from either source dedupes the same way.
+// The public OSM services refuse Supabase's servers: from an Edge Function,
+// Overpass answers 406 and Nominatim 403, while the same requests work from a
+// laptop. Geoapify, a hosted OSM provider, is therefore the main source
+// (GEOAPIFY_API_KEY, an Edge Function secret). Overpass and then Nominatim
+// remain as fallbacks; from Supabase they fail within seconds, so trying them
+// costs little. All three return OSM ids, so `node/123` from any source
+// dedupes the same way.
 
 export interface LatLng { latitude: number; longitude: number; }
 
@@ -18,6 +21,8 @@ export interface VenueCandidate {
 }
 
 export const AMENITIES = ['restaurant', 'bar'] as const;
+export const GEOAPIFY_URL = 'https://api.geoapify.com/v2/places';
+export const GEOAPIFY_TIMEOUT_MS = 10_000;
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 export const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 export const OVERPASS_TIMEOUT_MS = 20_000;
@@ -120,6 +125,61 @@ export function parseNominatimResults(results: NominatimResult[]): VenueCandidat
   return out;
 }
 
+
+export interface GeoapifyFeature {
+  properties?: {
+    name?: string;
+    lat?: number;
+    lon?: number;
+    housenumber?: string;
+    street?: string;
+    city?: string;
+    categories?: string[];
+    place_id?: string;
+    datasource?: { sourcename?: string; raw?: { osm_id?: number; osm_type?: string } };
+  };
+}
+
+const OSM_TYPES: Record<string, string> = { n: 'node', w: 'way', r: 'relation' };
+
+export function geoapifyUrl(center: LatLng, radiusM: number, limit: number, apiKey: string): string {
+  const params = new URLSearchParams({
+    categories: AMENITIES.map((a) => `catering.${a}`).join(','),
+    filter: `circle:${center.longitude},${center.latitude},${radiusM}`,
+    bias: `proximity:${center.longitude},${center.latitude}`,
+    limit: String(limit),
+    apiKey,
+  });
+  return `${GEOAPIFY_URL}?${params}`;
+}
+
+export function parseGeoapifyFeatures(features: GeoapifyFeature[]): VenueCandidate[] {
+  const out: VenueCandidate[] = [];
+  for (const f of features) {
+    const p = f.properties ?? {};
+    if (!p.name || typeof p.lat !== 'number' || typeof p.lon !== 'number') continue;
+
+    const raw = p.datasource?.raw;
+    const osmType = raw?.osm_type ? OSM_TYPES[raw.osm_type] : undefined;
+    const externalId = osmType && raw?.osm_id != null
+      ? `${osmType}/${Math.abs(raw.osm_id)}`
+      : p.place_id ? `geoapify/${p.place_id}` : null;
+    if (!externalId) continue;
+
+    const street = p.housenumber && p.street ? `${p.housenumber} ${p.street}` : p.street;
+    const amenity = AMENITIES.find((a) => p.categories?.includes(`catering.${a}`)) ?? null;
+    out.push({
+      externalId,
+      name: p.name,
+      address: [street, p.city].filter(Boolean).join(', ') || null,
+      latitude: p.lat,
+      longitude: p.lon,
+      category: amenity,
+    });
+  }
+  return out;
+}
+
 async function fetchWithTimeout(fetchFn: typeof fetch, url: string, init: RequestInit, ms: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -131,7 +191,7 @@ async function fetchWithTimeout(fetchFn: typeof fetch, url: string, init: Reques
 }
 
 export interface VenueLookup {
-  source: 'overpass' | 'nominatim' | 'none';
+  source: 'geoapify' | 'overpass' | 'nominatim' | 'none';
   candidates: VenueCandidate[];
 }
 
@@ -144,7 +204,27 @@ export async function findVenues(
   radiusM: number,
   limit: number,
   fetchFn: typeof fetch = fetch,
+  // null = no key (tests); omitted = read the Edge Function secret.
+  geoapifyKey: string | null = Deno.env.get('GEOAPIFY_API_KEY') ?? null,
 ): Promise<VenueLookup> {
+  if (geoapifyKey) {
+    try {
+      const res = await fetchWithTimeout(fetchFn, geoapifyUrl(center, radiusM, limit, geoapifyKey), {
+        headers: { Accept: 'application/json' },
+      }, GEOAPIFY_TIMEOUT_MS);
+      if (res.ok) {
+        const { features = [] } = await res.json() as { features?: GeoapifyFeature[] };
+        return { source: 'geoapify', candidates: parseGeoapifyFeatures(features) };
+      }
+      await res.body?.cancel();
+      console.warn(`Geoapify returned ${res.status}, falling back to Overpass`);
+    } catch (err) {
+      console.warn('Geoapify failed or timed out, falling back to Overpass:', err instanceof Error ? err.name : err);
+    }
+  } else {
+    console.warn('GEOAPIFY_API_KEY is not set, using the public OSM services');
+  }
+
   try {
     const res = await fetchWithTimeout(fetchFn, OVERPASS_URL, {
       method: 'POST',

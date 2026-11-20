@@ -80,7 +80,7 @@ supabase/
 
 1. **Service role key never on the client.** It exists only in Edge Function environment variables. The client uses the anon key only.
 2. **RLS on every table, no exceptions.** New tables must have RLS enabled and policies added to `002_rls_policies.sql` before shipping.
-3. **Place data comes from OpenStreetMap via the Overpass API** — no API key required. Do not re-introduce Google Places API.
+3. **Place data comes from OpenStreetMap only** — via Geoapify (a hosted OSM provider; `GEOAPIFY_API_KEY` is an Edge Function secret, never in the client or git), with the public Overpass and Nominatim services as fallbacks (`supabase/functions/_shared/osm.ts`). The public services block Supabase's servers (406/403), which is why Geoapify is primary. Do not re-introduce Google Places API.
 4. **PKCE flow** — `flowType: 'pkce'` must remain set in `src/lib/supabase.ts`. Do not switch to `implicit`.
 5. **Location data minimal retention** — `rsvps.latitude` and `rsvps.longitude` are nullified by pg_cron after a ping reaches a terminal state. Do not add queries that persist or export location beyond the ping lifecycle.
 6. **Input validation** — all user-supplied text must pass through the relevant Zod schema before any DB write. Max lengths are enforced at both schema and DB level.
