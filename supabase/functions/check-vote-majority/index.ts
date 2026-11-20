@@ -50,11 +50,14 @@ Deno.serve(async (req) => {
     const totalIn = inRsvps?.length ?? 0;
     if (totalIn === 0) return Response.json({ skipped: 'no_in_rsvps' });
 
-    // Count votes per place
+    // Count votes per place, from people still coming only: a leaver's vote
+    // is deleted (026), and this guards against any that slip through.
+    const inUserIds = (inRsvps ?? []).map((r: { user_id: string }) => r.user_id);
     const { data: votes } = await supabase
       .from('votes')
       .select('place_id')
-      .eq('ping_id', pingId);
+      .eq('ping_id', pingId)
+      .in('user_id', inUserIds);
 
     if (!votes?.length) return Response.json({ skipped: 'no_votes' });
 
