@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFeedPings, useFeedPingsRealtime } from '@/hooks/usePings';
 import { useGroups } from '@/hooks/useGroups';
+import { useProfile } from '@/hooks/useProfile';
 import { GlassCard } from '@/components/GlassCard';
 import { Badge } from '@/components/Badge';
 import { colors, BOTTOM_TAB_PADDING } from '@/lib/theme';
@@ -19,6 +20,7 @@ import type { Ping, Place } from '@/schemas';
 
 type FeedPing = Ping & {
   groups?: { name: string };
+  rsvps?: { id: string; user_id: string; status: 'in' | 'out' | 'maybe' }[];
   places?: Pick<Place, 'id' | 'name' | 'address' | 'latitude' | 'longitude'> | null;
 };
 
@@ -27,6 +29,7 @@ export default function FeedScreen() {
   const { data: pings, isLoading, isError, refetch, isRefetching } = useFeedPings();
   const { data: groups, isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
   useFeedPingsRealtime();
+  const { data: profile } = useProfile();
 
   const hasGroups = (groups?.length ?? 0) > 0;
   // A failed groups load must not look like "no groups yet".
@@ -69,7 +72,12 @@ export default function FeedScreen() {
                 colors={[colors.accent]}
               />
             }
-            renderItem={({ item }) => <PingCard ping={item} />}
+            renderItem={({ item }) => (
+              <PingCard
+                ping={item}
+                isOut={item.rsvps?.some((r) => r.user_id === profile?.id && r.status === 'out') ?? false}
+              />
+            )}
             ListEmptyComponent={
               loadFailed ? (
                 <LoadError what="your pings" onRetry={() => { refetch(); refetchGroups(); }} />
@@ -94,12 +102,12 @@ export default function FeedScreen() {
 
 // ─── Ping card ────────────────────────────────────────────────────────────────
 
-function PingCard({ ping }: { ping: FeedPing }) {
+function PingCard({ ping, isOut }: { ping: FeedPing; isOut: boolean }) {
   const router = useRouter();
   const confirmedPlace = ping.status === 'confirmed' ? ping.places : null;
 
   return (
-    <GlassCard style={[styles.card, confirmedPlace && styles.cardConfirmed]}>
+    <GlassCard style={[styles.card, confirmedPlace && styles.cardConfirmed, isOut && styles.cardOut]}>
       <TouchableOpacity
         onPress={() => router.push(`/(app)/(feed)/ping/${ping.id}`)}
         accessibilityRole="button"
@@ -113,6 +121,7 @@ function PingCard({ ping }: { ping: FeedPing }) {
           <Badge status={ping.status} />
         </View>
         <Text style={styles.message} numberOfLines={2}>{ping.message}</Text>
+        {isOut && <Text style={styles.outLabel}>You're out · tap to rejoin</Text>}
 
         {confirmedPlace ? (
           <>
@@ -201,6 +210,8 @@ const styles = StyleSheet.create({
   // ── Ping cards ────────────────────────────────────────────────────────────
   card: { padding: 16, gap: 8 },
   cardConfirmed: { borderColor: colors.success, backgroundColor: colors.success + '14' },
+  cardOut: { opacity: 0.55 },
+  outLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   groupName: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   message: { fontSize: 17, fontWeight: '600', color: colors.text, lineHeight: 22 },
